@@ -1,0 +1,596 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Laser Tag</title>
+    <link rel="icon" href="LaserIcon.png" type="image/png">
+    <style>
+        body {
+            font-family: 'Orbitron', sans-serif;
+            margin: 0;
+            padding: 0;
+            background: linear-gradient(45deg, #121212, #ff0000, #0000ff);
+            background-size: 400% 400%;
+            animation: gradientBG 15s ease infinite;
+            color: white;
+            text-align: center;
+            transition: all 0.3s;
+        }
+
+        @keyframes gradientBG {
+            0% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+            100% { background-position: 0% 50%; }
+        }
+
+        .light-mode { background: white; color: black; }
+        .neon-red { background: #300; color: #f88; }
+        .laser-blue { background: #013; color: #8cf; }
+        
+        header {
+            background: rgba(0, 0, 0, 0.8);
+            padding: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            box-shadow: 0 0 20px #ff0000;
+        }
+        
+        header img {
+            height: 90px;
+            margin-left: 10px;
+            cursor: pointer;
+            border-radius: 10px;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        
+        header img:hover { transform: scale(1.1); box-shadow: 0 0 15px #ff0000; }
+        
+        header h1 { margin: 0; flex-grow: 1; text-align: left; padding-left: 20px; }
+        
+        .search-bar {
+            padding: 10px;
+            border-radius: 5px;
+            border: 2px solid #ff0000;
+            font-size: 14px;
+            width: 200px;
+            background: #222;
+            color: white;
+        }
+        
+        .button {
+            padding: 12px 24px;
+            border: none;
+            cursor: pointer;
+            background: #ff0000;
+            color: white;
+            transition: all 0.3s;
+            border-radius: 8px;
+            font-size: 16px;
+            margin: 10px;
+            box-shadow: 0 0 10px #ff0000;
+        }
+        
+        .button:hover {
+            background: #cc0000;
+            transform: scale(1.05);
+            box-shadow: 0 0 20px #ff0000;
+        }
+
+        .container {
+            max-width: 450px;
+            margin: 20px auto;
+            padding: 20px;
+            background: rgba(51, 51, 51, 0.9);
+            border-radius: 10px;
+            box-shadow: 0 0 25px rgba(255, 0, 0, 0.7);
+            transition: transform 0.3s;
+        }
+
+        .container:hover { transform: translateY(-5px); }
+
+        .input-field {
+            display: block;
+            width: 100%;
+            margin: 10px 0;
+            padding: 10px;
+            border-radius: 5px;
+            border: 2px solid #ff0000;
+            font-size: 14px;
+            background: #222;
+            color: white;
+        }
+
+        .hidden { display: none; }
+
+        #leaderboard, #rules, #chat, #match-history, #admin-tools {
+            margin: 20px auto;
+            max-width: 450px;
+            padding: 10px;
+            background: rgba(34, 34, 34, 0.9);
+            border-radius: 10px;
+            box-shadow: 0 0 15px #ff0000;
+        }
+
+        .achievement {
+            background: #444;
+            padding: 8px;
+            margin: 5px 0;
+            border-radius: 5px;
+            border: 1px solid #ff0000;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0% { box-shadow: 0 0 5px #ff0000; }
+            50% { box-shadow: 0 0 15px #ff0000; }
+            100% { box-shadow: 0 0 5px #ff0000; }
+        }
+
+        #chat-box {
+            height: 150px;
+            overflow-y: scroll;
+            background: #111;
+            padding: 10px;
+            border-radius: 5px;
+            margin-bottom: 10px;
+        }
+    </style>
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <header>
+        <div>
+            <img src="LaserIcon.png" alt="Laser Tag Icon" onclick="showPage('home')">
+            <h1>Laser Tag</h1>
+        </div>
+        <input type="text" class="search-bar" id="search-bar" placeholder="Search users..." onkeyup="searchUsers()">
+    </header>
+    
+    <main id="content">
+        <section id="home">
+            <h2>Join the Battle!</h2>
+            <button class="button" id="login-btn" onclick="playSound('click'); showPage('login-form')">Login</button>
+            <button class="button" id="register-btn" onclick="playSound('click'); showPage('register-form')">Register</button>
+            <button class="button hidden" id="profile-btn" onclick="playSound('click'); showPage('profile')">Profile</button>
+            <button class="button" id="rules-btn" onclick="playSound('click'); showPage('rules')">Rules</button>
+            <button class="button" id="settings-btn" onclick="playSound('click'); showPage('settings')">Settings</button>
+            <button class="button hidden" id="play-btn" onclick="playSound('fanfare'); launchRoblox()">Play Now</button>
+            <button class="button hidden" id="join-friend-btn" onclick="playSound('click'); joinFriend()">Join Friend</button>
+            <button class="button hidden" id="admin-tools-btn" onclick="playSound('click'); showPage('admin-tools')">Admin Tools</button>
+            <button class="button hidden" id="logout-btn" onclick="logout()">Logout</button>
+        </section>
+        
+        <div id="login-form" class="container hidden">
+            <h2>Login</h2>
+            <input type="text" id="login-username" class="input-field" placeholder="Username">
+            <input type="password" id="login-password" class="input-field" placeholder="Password">
+            <button class="button" onclick="login()">Login</button>
+            <button class="button" onclick="showPage('home')">Back</button>
+        </div>
+
+        <div id="register-form" class="container hidden">
+            <h2>Register</h2>
+            <input type="text" id="reg-username" class="input-field" placeholder="Username">
+            <input type="password" id="reg-password" class="input-field" placeholder="Password">
+            <button class="button" onclick="register()">Register</button>
+            <button class="button" onclick="showPage('home')">Back</button>
+        </div>
+
+        <div id="profile" class="container hidden">
+            <h2>Profile</h2>
+            <p>Welcome, <span id="user-name">User</span>!</p>
+            <p>Games Played: <span id="games-played">0</span></p>
+            <p>Kills: <input type="number" id="kills" class="input-field" value="0" onchange="updateStats()"></p>
+            <p>Deaths: <input type="number" id="deaths" class="input-field" value="0" onchange="updateStats()"></p>
+            <div id="achievements"></div>
+            <button class="button" onclick="fetchRealStats()">Refresh Stats</button>
+            <button class="button" onclick="logout()">Logout</button>
+        </div>
+
+        <div id="settings" class="container hidden">
+            <h2>Settings</h2>
+            <h3>Appearance</h3>
+            <button class="button" onclick="setTheme('dark')">Dark Mode</button>
+            <button class="button" onclick="setTheme('light')">Light Mode</button>
+            <button class="button" onclick="setTheme('neon-red')">Neon Red</button>
+            <button class="button" onclick="setTheme('laser-blue')">Laser Blue</button>
+            <h3>Account</h3>
+            <input type="password" id="current-password" class="input-field" placeholder="Current Password">
+            <input type="password" id="new-password" class="input-field" placeholder="New Password">
+            <button class="button" onclick="changePassword()">Change Password</button>
+            <h3>Preferences</h3>
+            <label><input type="checkbox" id="mute-sounds" onchange="toggleMute()"> Mute Sounds</label><br>
+            <button class="button" onclick="deleteAccount()">Delete Account</button>
+            <button class="button" onclick="showPage('home')">Back</button>
+        </div>
+
+        <div id="rules" class="container hidden">
+            <h2>Game Rules</h2>
+            <p>1. Tag opponents with your laser to score kills!</p>
+            <p>2. Avoid hits—each hit counts as a death.</p>
+            <p>3. Most kills in 5 minutes wins!</p>
+            <button class="button" onclick="showPage('home')">Back</button>
+        </div>
+
+        <div id="admin-tools" class="container hidden">
+            <h2>Admin Tools</h2>
+            <input type="text" id="admin-target" class="input-field" placeholder="Target Username">
+            <button class="button" onclick="banUser()">Ban User</button>
+            <button class="button" onclick="unbanUser()">Unban User</button>
+            <button class="button" onclick="makeAdmin()">Make Admin</button>
+            <button class="button" onclick="removeAdmin()">Remove Admin</button>
+            <button class="button" onclick="resetUserStats()">Reset User Stats</button>
+            <button class="button" onclick="showPage('home')">Back</button>
+        </div>
+
+        <div id="leaderboard" class="hidden">
+            <h3>Leaderboard</h3>
+            <p>Top Player: <span id="top-player">N/A</span> - <span id="top-score">0</span> Kills</p>
+        </div>
+
+        <div id="chat" class="hidden">
+            <h3>Chat</h3>
+            <div id="chat-box"></div>
+            <input type="text" id="chat-input" class="input-field" placeholder="Type a message...">
+            <button class="button" onclick="sendChat()">Send</button>
+        </div>
+
+        <div id="match-history" class="hidden">
+            <h3>Match History</h3>
+            <div id="history-list"></div>
+        </div>
+    </main>
+    
+    <audio id="click-sound" src="https://www.myinstants.com/media/sounds/button-click.mp3" preload="auto"></audio>
+    <audio id="fanfare-sound" src="https://www.myinstants.com/media/sounds/fanfare.mp3" preload="auto"></audio>
+    <audio id="ambient-sound" src="https://www.myinstants.com/media/sounds/sci-fi-ambience.mp3" preload="auto" loop></audio>
+    
+    <script>
+        let isLoggedIn = false;
+        let currentUser = null;
+        let userData = JSON.parse(localStorage.getItem('userData')) || {};
+        let isMuted = false;
+
+        // Initialize owner account if not already present
+        if (!userData['Halaldeveloper']) {
+            userData['Halaldeveloper'] = {
+                password: 'HOOKfor9',
+                gamesPlayed: 0,
+                kills: 0,
+                deaths: 0,
+                history: [],
+                isAdmin: true,
+                isBanned: false
+            };
+            localStorage.setItem('userData', JSON.stringify(userData));
+        }
+
+        window.onload = () => {
+            if (!isMuted) document.getElementById("ambient-sound").play();
+            if (currentUser && userData[currentUser]) {
+                isLoggedIn = true;
+                updateUI();
+                updateProfile(currentUser);
+                showPage('home');
+            }
+        };
+
+        function showPage(page) {
+            document.querySelectorAll("main section, .container").forEach(section => section.classList.add("hidden"));
+            document.getElementById(page).classList.remove("hidden");
+            if (isLoggedIn && page === 'home') {
+                document.getElementById('leaderboard').classList.remove('hidden');
+                document.getElementById('chat').classList.remove('hidden');
+                document.getElementById('match-history').classList.remove('hidden');
+            } else {
+                document.getElementById('leaderboard').classList.add('hidden');
+                document.getElementById('chat').classList.add('hidden');
+                document.getElementById('match-history').classList.add('hidden');
+            }
+        }
+
+        function login() {
+            const username = document.getElementById("login-username").value;
+            const password = document.getElementById("login-password").value;
+            if (userData[username] && userData[username].password === password) {
+                if (userData[username].isBanned) {
+                    alert("You are banned from this site!");
+                    return;
+                }
+                playSound('fanfare');
+                alert("Login successful!");
+                currentUser = username;
+                document.getElementById("user-name").innerText = username;
+                isLoggedIn = true;
+                updateUI();
+                updateProfile(username);
+                showPage('home');
+            } else {
+                alert("Invalid username or password.");
+            }
+        }
+
+        function register() {
+            const username = document.getElementById("reg-username").value;
+            const password = document.getElementById("reg-password").value;
+            if (username && password) {
+                if (userData[username]) {
+                    alert("Username already taken!");
+                } else {
+                    userData[username] = {
+                        password,
+                        gamesPlayed: 0,
+                        kills: 0,
+                        deaths: 0,
+                        history: [],
+                        isAdmin: false,
+                        isBanned: false
+                    };
+                    localStorage.setItem('userData', JSON.stringify(userData));
+                    playSound('fanfare');
+                    alert("Registration successful! Please login.");
+                    showPage('login-form');
+                }
+            } else {
+                alert("Please enter a username and password.");
+            }
+        }
+
+        function logout() {
+            isLoggedIn = false;
+            currentUser = null;
+            playSound('click');
+            alert("You have been logged out.");
+            updateUI();
+            showPage('home');
+        }
+
+        function updateUI() {
+            document.getElementById("login-btn").classList.toggle("hidden", isLoggedIn);
+            document.getElementById("register-btn").classList.toggle("hidden", isLoggedIn);
+            document.getElementById("profile-btn").classList.toggle("hidden", !isLoggedIn);
+            document.getElementById("play-btn").classList.toggle("hidden", !isLoggedIn);
+            document.getElementById("join-friend-btn").classList.toggle("hidden", !isLoggedIn);
+            document.getElementById("logout-btn").classList.toggle("hidden", !isLoggedIn);
+            document.getElementById("admin-tools-btn").classList.toggle("hidden", !isLoggedIn || !userData[currentUser].isAdmin);
+        }
+
+        function updateProfile(username) {
+            document.getElementById("games-played").innerText = userData[username].gamesPlayed || 0;
+            document.getElementById("kills").value = userData[username].kills || 0;
+            document.getElementById("deaths").value = userData[username].deaths || 0;
+            updateLeaderboard();
+            updateAchievements(username);
+            updateMatchHistory(username);
+        }
+
+        function updateStats() {
+            const username = document.getElementById("user-name").innerText;
+            userData[username].kills = parseInt(document.getElementById("kills").value) || 0;
+            userData[username].deaths = parseInt(document.getElementById("deaths").value) || 0;
+            localStorage.setItem('userData', JSON.stringify(userData));
+            updateLeaderboard();
+            updateAchievements(username);
+        }
+
+        function setTheme(theme) {
+            document.body.className = '';
+            if (theme !== 'dark') document.body.classList.add(theme);
+            playSound('click');
+        }
+
+        function playSound(type) {
+            if (isMuted) return;
+            const sound = document.getElementById(type === 'click' ? 'click-sound' : 'fanfare-sound');
+            sound.currentTime = 0;
+            sound.play();
+        }
+
+        function toggleMute() {
+            isMuted = document.getElementById("mute-sounds").checked;
+            const ambient = document.getElementById("ambient-sound");
+            if (isMuted) ambient.pause(); else ambient.play();
+        }
+
+        function launchRoblox() {
+            window.open("roblox://placeId=109363541562257", "_blank");
+            userData[currentUser].gamesPlayed = (userData[currentUser].gamesPlayed || 0) + 1;
+            userData[currentUser].history.push(`Played on ${new Date().toLocaleString()}`);
+            localStorage.setItem('userData', JSON.stringify(userData));
+            updateProfile(currentUser);
+            playSound('fanfare');
+        }
+
+        function joinFriend() {
+            const friend = prompt("Enter friend's username:");
+            if (friend && userData[friend]) {
+                if (userData[friend].isBanned) {
+                    alert(`${friend} is banned and cannot be joined!`);
+                    return;
+                }
+                alert(`Joining ${friend}'s game! (Simulated)`);
+                playSound('fanfare');
+            } else {
+                alert("Friend not found!");
+            }
+        }
+
+        function updateLeaderboard() {
+            let topPlayer = "N/A";
+            let topScore = 0;
+            for (let user in userData) {
+                if (!userData[user].isBanned && userData[user].kills > topScore) {
+                    topScore = userData[user].kills;
+                    topPlayer = user;
+                }
+            }
+            document.getElementById("top-player").innerText = topPlayer;
+            document.getElementById("top-score").innerText = topScore;
+        }
+
+        function searchUsers() {
+            const query = document.getElementById("search-bar").value.toLowerCase();
+            if (query && isLoggedIn) {
+                for (let user in userData) {
+                    if (user.toLowerCase().includes(query)) {
+                        const status = userData[user].isBanned ? " (Banned)" : userData[user].isAdmin ? " (Admin)" : "";
+                        alert(`Found: ${user}${status} - Kills: ${userData[user].kills}, Deaths: ${userData[user].deaths}`);
+                        return;
+                    }
+                }
+                alert("No user found.");
+            }
+        }
+
+        function updateAchievements(username) {
+            const achievementsDiv = document.getElementById("achievements");
+            achievementsDiv.innerHTML = "";
+            const games = userData[username].gamesPlayed;
+            const kills = userData[username].kills;
+            const deaths = userData[username].deaths;
+            if (games >= 5) achievementsDiv.innerHTML += '<div class="achievement">🏆 Veteran: 5+ Games</div>';
+            if (kills >= 10) achievementsDiv.innerHTML += '<div class="achievement">🔫 Sharpshooter: 10+ Kills</div>';
+            if (deaths < 5 && games >= 5) achievementsDiv.innerHTML += '<div class="achievement">🛡️ Survivor: <5 Deaths in 5+ Games</div>';
+            if (kills >= 20) achievementsDiv.innerHTML += '<div class="achievement">💀 Terminator: 20+ Kills</div>';
+            if (games >= 10) achievementsDiv.innerHTML += '<div class="achievement">🌟 Elite: 10+ Games</div>';
+            if (userData[username].isAdmin) achievementsDiv.innerHTML += '<div class="achievement">👑 Admin: Site Moderator</div>';
+            if (achievementsDiv.innerHTML) playSound('fanfare');
+        }
+
+        function sendChat() {
+            const message = document.getElementById("chat-input").value;
+            if (message && isLoggedIn) {
+                document.getElementById("chat-box").innerHTML += `<p><b>${currentUser}:</b> ${message}</p>`;
+                document.getElementById("chat-input").value = "";
+                playSound('click');
+            }
+        }
+
+        function updateMatchHistory(username) {
+            const historyDiv = document.getElementById("history-list");
+            historyDiv.innerHTML = userData[username].history.map(match => `<p>${match}</p>`).join('');
+        }
+
+        function fetchRealStats() {
+            const simulatedStats = { kills: Math.floor(Math.random() * 50), deaths: Math.floor(Math.random() * 20) };
+            userData[currentUser].kills = simulatedStats.kills;
+            userData[currentUser].deaths = simulatedStats.deaths;
+            localStorage.setItem('userData', JSON.stringify(userData));
+            updateProfile(currentUser);
+            playSound('fanfare');
+            alert("Stats refreshed from game! (Simulated)");
+        }
+
+        function changePassword() {
+            const currentPass = document.getElementById("current-password").value;
+            const newPass = document.getElementById("new-password").value;
+            if (userData[currentUser].password === currentPass) {
+                if (newPass.length < 6) {
+                    alert("New password must be at least 6 characters long!");
+                    return;
+                }
+                userData[currentUser].password = newPass;
+                localStorage.setItem('userData', JSON.stringify(userData));
+                alert("Password changed successfully!");
+                document.getElementById("current-password").value = "";
+                document.getElementById("new-password").value = "";
+                playSound('fanfare');
+            } else {
+                alert("Current password is incorrect!");
+            }
+        }
+
+        function deleteAccount() {
+            if (confirm("Are you sure you want to delete your account? This cannot be undone!")) {
+                delete userData[currentUser];
+                localStorage.setItem('userData', JSON.stringify(userData));
+                logout();
+                alert("Account deleted successfully.");
+            }
+        }
+
+        // Admin Tools
+        function banUser() {
+            if (!userData[currentUser].isAdmin) return alert("You are not an admin!");
+            const target = document.getElementById("admin-target").value;
+            if (target === currentUser) return alert("You cannot ban yourself!");
+            if (userData[target]) {
+                if (userData[target].isAdmin && target !== 'Halaldeveloper') {
+                    userData[target].isBanned = true;
+                    localStorage.setItem('userData', JSON.stringify(userData));
+                    alert(`${target} has been banned!`);
+                    updateLeaderboard();
+                } else if (target === 'Halaldeveloper') {
+                    alert("You cannot ban the owner!");
+                } else {
+                    userData[target].isBanned = true;
+                    localStorage.setItem('userData', JSON.stringify(userData));
+                    alert(`${target} has been banned!`);
+                    updateLeaderboard();
+                }
+            } else {
+                alert("User not found!");
+            }
+        }
+
+        function unbanUser() {
+            if (!userData[currentUser].isAdmin) return alert("You are not an admin!");
+            const target = document.getElementById("admin-target").value;
+            if (userData[target]) {
+                userData[target].isBanned = false;
+                localStorage.setItem('userData', JSON.stringify(userData));
+                alert(`${target} has been unbanned!`);
+                updateLeaderboard();
+            } else {
+                alert("User not found!");
+            }
+        }
+
+        function makeAdmin() {
+            if (!userData[currentUser].isAdmin) return alert("You are not an admin!");
+            const target = document.getElementById("admin-target").value;
+            if (target === currentUser) return alert("You are already an admin!");
+            if (userData[target]) {
+                userData[target].isAdmin = true;
+                localStorage.setItem('userData', JSON.stringify(userData));
+                alert(`${target} is now an admin!`);
+                updateProfile(currentUser);
+            } else {
+                alert("User not found!");
+            }
+        }
+
+        function removeAdmin() {
+            if (!userData[currentUser].isAdmin) return alert("You are not an admin!");
+            const target = document.getElementById("admin-target").value;
+            if (target === currentUser) return alert("You cannot remove your own admin status!");
+            if (target === 'Halaldeveloper') return alert("You cannot remove the owner's admin status!");
+            if (userData[target]) {
+                userData[target].isAdmin = false;
+                localStorage.setItem('userData', JSON.stringify(userData));
+                alert(`${target} is no longer an admin!`);
+            } else {
+                alert("User not found!");
+            }
+        }
+
+        function resetUserStats() {
+            if (!userData[currentUser].isAdmin) return alert("You are not an admin!");
+            const target = document.getElementById("admin-target").value;
+            if (userData[target]) {
+                userData[target].kills = 0;
+                userData[target].deaths = 0;
+                userData[target].gamesPlayed = 0;
+                userData[target].history = [];
+                localStorage.setItem('userData', JSON.stringify(userData));
+                alert(`${target}'s stats have been reset!`);
+                if (target === currentUser) updateProfile(currentUser);
+            } else {
+                alert("User not found!");
+            }
+        }
+    </script>
+</body>
+</html>
