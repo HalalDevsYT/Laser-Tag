@@ -27,6 +27,7 @@
         .light-mode { background: white; color: black; }
         .neon-red { background: #300; color: #f88; }
         .laser-blue { background: #013; color: #8cf; }
+        .cosmic { background: linear-gradient(45deg, #0a001f, #ff00ff, #00ffff); background-size: 400% 400%; animation: gradientBG 10s ease infinite; }
         
         header {
             background: rgba(0, 0, 0, 0.8);
@@ -104,7 +105,7 @@
 
         .hidden { display: none; }
 
-        #leaderboard, #rules, #chat, #match-history, #admin-tools {
+        #leaderboard, #rules, #chat, #match-history, #admin-tools, #friends, #messages {
             margin: 20px auto;
             max-width: 450px;
             padding: 10px;
@@ -120,6 +121,7 @@
             border-radius: 5px;
             border: 1px solid #ff0000;
             animation: pulse 2s infinite;
+            position: relative;
         }
 
         @keyframes pulse {
@@ -128,13 +130,37 @@
             100% { box-shadow: 0 0 5px #ff0000; }
         }
 
-        #chat-box {
+        .achievement-earned {
+            animation: popIn 0.5s ease-out forwards;
+            background: #ff4444;
+        }
+
+        @keyframes popIn {
+            0% { transform: scale(0); opacity: 0; }
+            80% { transform: scale(1.1); opacity: 1; }
+            100% { transform: scale(1); }
+        }
+
+        #chat-box, #message-box {
             height: 150px;
             overflow-y: scroll;
             background: #111;
             padding: 10px;
             border-radius: 5px;
             margin-bottom: 10px;
+        }
+
+        /* Mobile Optimization */
+        @media (max-width: 600px) {
+            .container, #leaderboard, #rules, #chat, #match-history, #admin-tools, #friends, #messages {
+                max-width: 90%;
+            }
+            .button {
+                padding: 10px 20px;
+                font-size: 14px;
+            }
+            header img { height: 60px; }
+            .search-bar { width: 150px; }
         }
     </style>
     <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&display=swap" rel="stylesheet">
@@ -159,6 +185,9 @@
             <button class="button hidden" id="play-btn" onclick="playSound('fanfare'); launchRoblox()">Play Now</button>
             <button class="button hidden" id="join-friend-btn" onclick="playSound('click'); joinFriend()">Join Friend</button>
             <button class="button hidden" id="admin-tools-btn" onclick="playSound('click'); showPage('admin-tools')">Admin Tools</button>
+            <button class="button hidden" id="friends-btn" onclick="playSound('click'); showPage('friends')">Friends</button>
+            <button class="button hidden" id="messages-btn" onclick="playSound('click'); showPage('messages')">Messages</button>
+            <button class="button hidden" id="matchmaking-btn" onclick="joinMatchmaking()">Join Matchmaking</button>
             <button class="button hidden" id="logout-btn" onclick="logout()">Logout</button>
         </section>
         
@@ -196,13 +225,14 @@
             <button class="button" onclick="setTheme('light')">Light Mode</button>
             <button class="button" onclick="setTheme('neon-red')">Neon Red</button>
             <button class="button" onclick="setTheme('laser-blue')">Laser Blue</button>
+            <button class="button" onclick="setTheme('cosmic')">Cosmic</button>
             <h3>Account</h3>
             <input type="password" id="current-password" class="input-field" placeholder="Current Password">
             <input type="password" id="new-password" class="input-field" placeholder="New Password">
             <button class="button" onclick="changePassword()">Change Password</button>
             <h3>Preferences</h3>
             <label><input type="checkbox" id="mute-sounds" onchange="toggleMute()"> Mute Sounds</label><br>
-            <button class="button" onclick="deleteAccount()">Delete Account</button>
+            <button class="button" onclick="exportData()">Export Data</button>
             <button class="button" onclick="showPage('home')">Back</button>
         </div>
 
@@ -217,11 +247,31 @@
         <div id="admin-tools" class="container hidden">
             <h2>Admin Tools</h2>
             <input type="text" id="admin-target" class="input-field" placeholder="Target Username">
+            <input type="text" id="ban-reason" class="input-field" placeholder="Ban Reason (optional)">
             <button class="button" onclick="banUser()">Ban User</button>
             <button class="button" onclick="unbanUser()">Unban User</button>
             <button class="button" onclick="makeAdmin()">Make Admin</button>
             <button class="button" onclick="removeAdmin()">Remove Admin</button>
             <button class="button" onclick="resetUserStats()">Reset User Stats</button>
+            <button class="button" onclick="massBan()">Mass Ban</button>
+            <button class="button" onclick="massUnban()">Mass Unban</button>
+            <button class="button" onclick="showPage('home')">Back</button>
+        </div>
+
+        <div id="friends" class="container hidden">
+            <h2>Friends</h2>
+            <input type="text" id="friend-username" class="input-field" placeholder="Add Friend Username">
+            <button class="button" onclick="addFriend()">Add Friend</button>
+            <div id="friend-list"></div>
+            <button class="button" onclick="showPage('home')">Back</button>
+        </div>
+
+        <div id="messages" class="container hidden">
+            <h2>Messages</h2>
+            <input type="text" id="message-recipient" class="input-field" placeholder="Recipient Username">
+            <div id="message-box"></div>
+            <input type="text" id="message-input" class="input-field" placeholder="Type a private message...">
+            <button class="button" onclick="sendPrivateMessage()">Send</button>
             <button class="button" onclick="showPage('home')">Back</button>
         </div>
 
@@ -251,9 +301,11 @@
         let isLoggedIn = false;
         let currentUser = null;
         let userData = JSON.parse(localStorage.getItem('userData')) || {};
+        let chatHistory = JSON.parse(localStorage.getItem('chatHistory')) || [];
         let isMuted = false;
+        let matchmakingQueue = [];
 
-        // Initialize owner account if not already present
+        // Initialize owner account
         if (!userData['Halaldeveloper']) {
             userData['Halaldeveloper'] = {
                 password: 'HOOKfor9',
@@ -261,14 +313,19 @@
                 kills: 0,
                 deaths: 0,
                 history: [],
+                friends: [],
+                messages: [],
                 isAdmin: true,
-                isBanned: false
+                isOwner: true,
+                isBanned: false,
+                banReason: ''
             };
             localStorage.setItem('userData', JSON.stringify(userData));
         }
 
         window.onload = () => {
             if (!isMuted) document.getElementById("ambient-sound").play();
+            loadChatHistory();
             if (currentUser && userData[currentUser]) {
                 isLoggedIn = true;
                 updateUI();
@@ -296,7 +353,7 @@
             const password = document.getElementById("login-password").value;
             if (userData[username] && userData[username].password === password) {
                 if (userData[username].isBanned) {
-                    alert("You are banned from this site!");
+                    alert(`You are banned from this site! Reason: ${userData[username].banReason || 'No reason provided'}`);
                     return;
                 }
                 playSound('fanfare');
@@ -325,8 +382,11 @@
                         kills: 0,
                         deaths: 0,
                         history: [],
+                        friends: [],
+                        messages: [],
                         isAdmin: false,
-                        isBanned: false
+                        isBanned: false,
+                        banReason: ''
                     };
                     localStorage.setItem('userData', JSON.stringify(userData));
                     playSound('fanfare');
@@ -355,6 +415,9 @@
             document.getElementById("join-friend-btn").classList.toggle("hidden", !isLoggedIn);
             document.getElementById("logout-btn").classList.toggle("hidden", !isLoggedIn);
             document.getElementById("admin-tools-btn").classList.toggle("hidden", !isLoggedIn || !userData[currentUser].isAdmin);
+            document.getElementById("friends-btn").classList.toggle("hidden", !isLoggedIn);
+            document.getElementById("messages-btn").classList.toggle("hidden", !isLoggedIn);
+            document.getElementById("matchmaking-btn").classList.toggle("hidden", !isLoggedIn);
         }
 
         function updateProfile(username) {
@@ -364,6 +427,8 @@
             updateLeaderboard();
             updateAchievements(username);
             updateMatchHistory(username);
+            updateFriendList();
+            updateMessages();
         }
 
         function updateStats() {
@@ -377,7 +442,7 @@
 
         function setTheme(theme) {
             document.body.className = '';
-            if (theme !== 'dark') document.body.classList.add(theme);
+            document.body.classList.add(theme);
             playSound('click');
         }
 
@@ -435,7 +500,7 @@
             if (query && isLoggedIn) {
                 for (let user in userData) {
                     if (user.toLowerCase().includes(query)) {
-                        const status = userData[user].isBanned ? " (Banned)" : userData[user].isAdmin ? " (Admin)" : "";
+                        const status = userData[user].isBanned ? ` (Banned: ${userData[user].banReason || 'No reason'})` : userData[user].isAdmin ? " (Admin)" : "";
                         alert(`Found: ${user}${status} - Kills: ${userData[user].kills}, Deaths: ${userData[user].deaths}`);
                         return;
                     }
@@ -446,26 +511,46 @@
 
         function updateAchievements(username) {
             const achievementsDiv = document.getElementById("achievements");
+            const oldAchievements = achievementsDiv.innerHTML;
             achievementsDiv.innerHTML = "";
             const games = userData[username].gamesPlayed;
             const kills = userData[username].kills;
             const deaths = userData[username].deaths;
-            if (games >= 5) achievementsDiv.innerHTML += '<div class="achievement">🏆 Veteran: 5+ Games</div>';
-            if (kills >= 10) achievementsDiv.innerHTML += '<div class="achievement">🔫 Sharpshooter: 10+ Kills</div>';
-            if (deaths < 5 && games >= 5) achievementsDiv.innerHTML += '<div class="achievement">🛡️ Survivor: <5 Deaths in 5+ Games</div>';
-            if (kills >= 20) achievementsDiv.innerHTML += '<div class="achievement">💀 Terminator: 20+ Kills</div>';
-            if (games >= 10) achievementsDiv.innerHTML += '<div class="achievement">🌟 Elite: 10+ Games</div>';
-            if (userData[username].isAdmin) achievementsDiv.innerHTML += '<div class="achievement">👑 Admin: Site Moderator</div>';
-            if (achievementsDiv.innerHTML) playSound('fanfare');
+            if (games >= 5) addAchievement(achievementsDiv, "🏆 Veteran: 5+ Games", oldAchievements);
+            if (kills >= 10) addAchievement(achievementsDiv, "🔫 Sharpshooter: 10+ Kills", oldAchievements);
+            if (deaths < 5 && games >= 5) addAchievement(achievementsDiv, "🛡️ Survivor: <5 Deaths in 5+ Games", oldAchievements);
+            if (kills >= 20) addAchievement(achievementsDiv, "💀 Terminator: 20+ Kills", oldAchievements);
+            if (games >= 10) addAchievement(achievementsDiv, "🌟 Elite: 10+ Games", oldAchievements);
+            if (userData[username].isAdmin) addAchievement(achievementsDiv, "👑 Admin: Site Moderator", oldAchievements);
+        }
+
+        function addAchievement(div, text, oldHTML) {
+            if (!oldHTML.includes(text)) {
+                const achievement = document.createElement("div");
+                achievement.className = "achievement achievement-earned";
+                achievement.innerText = text;
+                div.appendChild(achievement);
+                playSound('fanfare');
+                setTimeout(() => achievement.className = "achievement", 1000);
+            } else {
+                div.innerHTML += `<div class="achievement">${text}</div>`;
+            }
         }
 
         function sendChat() {
             const message = document.getElementById("chat-input").value;
             if (message && isLoggedIn) {
-                document.getElementById("chat-box").innerHTML += `<p><b>${currentUser}:</b> ${message}</p>`;
+                const chatMessage = `<p><b>${currentUser}:</b> ${message}</p>`;
+                document.getElementById("chat-box").innerHTML += chatMessage;
+                chatHistory.push(chatMessage);
+                localStorage.setItem('chatHistory', JSON.stringify(chatHistory));
                 document.getElementById("chat-input").value = "";
                 playSound('click');
             }
+        }
+
+        function loadChatHistory() {
+            document.getElementById("chat-box").innerHTML = chatHistory.join('');
         }
 
         function updateMatchHistory(username) {
@@ -484,6 +569,10 @@
         }
 
         function changePassword() {
+            if (!isLoggedIn) {
+                alert("You must be logged in to change your password!");
+                return;
+            }
             const currentPass = document.getElementById("current-password").value;
             const newPass = document.getElementById("new-password").value;
             if (userData[currentUser].password === currentPass) {
@@ -502,34 +591,87 @@
             }
         }
 
-        function deleteAccount() {
-            if (confirm("Are you sure you want to delete your account? This cannot be undone!")) {
-                delete userData[currentUser];
-                localStorage.setItem('userData', JSON.stringify(userData));
-                logout();
-                alert("Account deleted successfully.");
+        // Feature 1: Matchmaking System
+        function joinMatchmaking() {
+            if (matchmakingQueue.includes(currentUser)) {
+                alert("You are already in the matchmaking queue!");
+                return;
+            }
+            matchmakingQueue.push(currentUser);
+            alert("Added to matchmaking queue! Waiting for players...");
+            playSound('click');
+            setTimeout(checkMatchmaking, 5000); // Check every 5 seconds
+        }
+
+        function checkMatchmaking() {
+            if (matchmakingQueue.length >= 2) {
+                const players = matchmakingQueue.splice(0, 2);
+                alert(`Match found! ${players.join(" vs ")} are now playing! (Simulated)`);
+                playSound('fanfare');
             }
         }
 
-        // Admin Tools
+        // Feature 4: Friend List
+        function addFriend() {
+            const friend = document.getElementById("friend-username").value;
+            if (friend === currentUser) return alert("You cannot add yourself!");
+            if (userData[friend]) {
+                if (!userData[currentUser].friends.includes(friend)) {
+                    userData[currentUser].friends.push(friend);
+                    localStorage.setItem('userData', JSON.stringify(userData));
+                    updateFriendList();
+                    alert(`${friend} added to your friends list!`);
+                    playSound('click');
+                } else {
+                    alert("This user is already your friend!");
+                }
+            } else {
+                alert("User not found!");
+            }
+        }
+
+        function updateFriendList() {
+            const friendList = document.getElementById("friend-list");
+            friendList.innerHTML = userData[currentUser].friends.map(f => `<p>${f}</p>`).join('');
+        }
+
+        // Feature 5: Private Messaging
+        function sendPrivateMessage() {
+            const recipient = document.getElementById("message-recipient").value;
+            const message = document.getElementById("message-input").value;
+            if (recipient && message && userData[recipient]) {
+                const msg = { from: currentUser, text: message, time: new Date().toLocaleString() };
+                userData[recipient].messages.push(msg);
+                userData[currentUser].messages.push(msg);
+                localStorage.setItem('userData', JSON.stringify(userData));
+                document.getElementById("message-input").value = "";
+                updateMessages();
+                alert(`Message sent to ${recipient}!`);
+                playSound('click');
+            } else {
+                alert("Recipient not found or message empty!");
+            }
+        }
+
+        function updateMessages() {
+            const messageBox = document.getElementById("message-box");
+            messageBox.innerHTML = userData[currentUser].messages.map(m => `<p><b>${m.from}:</b> ${m.text} (${m.time})</p>`).join('');
+        }
+
+        // Admin Tools with Features 8 & 9
         function banUser() {
             if (!userData[currentUser].isAdmin) return alert("You are not an admin!");
             const target = document.getElementById("admin-target").value;
+            const reason = document.getElementById("ban-reason").value;
             if (target === currentUser) return alert("You cannot ban yourself!");
             if (userData[target]) {
-                if (userData[target].isAdmin && target !== 'Halaldeveloper') {
-                    userData[target].isBanned = true;
-                    localStorage.setItem('userData', JSON.stringify(userData));
-                    alert(`${target} has been banned!`);
-                    updateLeaderboard();
-                } else if (target === 'Halaldeveloper') {
-                    alert("You cannot ban the owner!");
-                } else {
-                    userData[target].isBanned = true;
-                    localStorage.setItem('userData', JSON.stringify(userData));
-                    alert(`${target} has been banned!`);
-                    updateLeaderboard();
-                }
+                if (userData[target].isOwner) return alert("You cannot ban the owner!");
+                userData[target].isBanned = true;
+                userData[target].banReason = reason || "No reason provided";
+                localStorage.setItem('userData', JSON.stringify(userData));
+                alert(`${target} has been banned! Reason: ${userData[target].banReason}`);
+                playSound('click');
+                updateLeaderboard();
             } else {
                 alert("User not found!");
             }
@@ -540,8 +682,10 @@
             const target = document.getElementById("admin-target").value;
             if (userData[target]) {
                 userData[target].isBanned = false;
+                userData[target].banReason = '';
                 localStorage.setItem('userData', JSON.stringify(userData));
                 alert(`${target} has been unbanned!`);
+                playSound('click');
                 updateLeaderboard();
             } else {
                 alert("User not found!");
@@ -556,7 +700,7 @@
                 userData[target].isAdmin = true;
                 localStorage.setItem('userData', JSON.stringify(userData));
                 alert(`${target} is now an admin!`);
-                updateProfile(currentUser);
+                playSound('fanfare');
             } else {
                 alert("User not found!");
             }
@@ -571,6 +715,7 @@
                 userData[target].isAdmin = false;
                 localStorage.setItem('userData', JSON.stringify(userData));
                 alert(`${target} is no longer an admin!`);
+                playSound('click');
             } else {
                 alert("User not found!");
             }
@@ -586,10 +731,70 @@
                 userData[target].history = [];
                 localStorage.setItem('userData', JSON.stringify(userData));
                 alert(`${target}'s stats have been reset!`);
+                playSound('click');
                 if (target === currentUser) updateProfile(currentUser);
             } else {
-                alert("User not found!.");
+                alert("User not found!");
             }
+        }
+
+        function massBan() {
+            if (!userData[currentUser].isAdmin) return alert("You are not an admin!");
+            const targets = prompt("Enter usernames to ban (comma-separated):");
+            const reason = document.getElementById("ban-reason").value;
+            if (targets) {
+                const userList = targets.split(',').map(t => t.trim());
+                let banned = [];
+                userList.forEach(target => {
+                    if (userData[target] && target !== currentUser && !userData[target].isOwner) {
+                        userData[target].isBanned = true;
+                        userData[target].banReason = reason || "Mass ban - no reason provided";
+                        banned.push(target);
+                    }
+                });
+                localStorage.setItem('userData', JSON.stringify(userData));
+                alert(`Banned: ${banned.join(', ') || 'None'}`);
+                playSound('click');
+                updateLeaderboard();
+            }
+        }
+
+        function massUnban() {
+            if (!userData[currentUser].isAdmin) return alert("You are not an admin!");
+            const targets = prompt("Enter usernames to unban (comma-separated):");
+            if (targets) {
+                const userList = targets.split(',').map(t => t.trim());
+                let unbanned = [];
+                userList.forEach(target => {
+                    if (userData[target]) {
+                        userData[target].isBanned = false;
+                        userData[target].banReason = '';
+                        unbanned.push(target);
+                    }
+                });
+                localStorage.setItem('userData', JSON.stringify(userData));
+                alert(`Unbanned: ${unbanned.join(', ') || 'None'}`);
+                playSound('click');
+                updateLeaderboard();
+            }
+        }
+
+        // Feature 15: Basic Backend Simulation
+        function exportData() {
+            const data = {
+                userData: userData,
+                chatHistory: chatHistory
+            };
+            const json = JSON.stringify(data, null, 2);
+            const blob = new Blob([json], { type: "application/json" });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement("a");
+            a.href = url;
+            a.download = "laser_tag_data.json";
+            a.click();
+            URL.revokeObjectURL(url);
+            alert("Data exported! Save this file to import later.");
+            playSound('click');
         }
     </script>
 </body>
