@@ -509,11 +509,20 @@
         }
 
         function updatePlayerCount() {
-            // Simulated for now; replace with real API call after backend setup
-            const playerCount = Math.floor(Math.random() * 50); // Random 0-50
-            document.getElementById("online-players").innerText = playerCount;
-            setTimeout(updatePlayerCount, 10000); // Update every 10 seconds
-        }
+    fetch('https://d82c5016-bcff-40a1-aa09-768942016abd-00-39hwdpipka72n.janeway.replit.dev/player-count')
+        .then(response => {
+            if (!response.ok) throw new Error('Network response was not ok');
+            return response.json();
+        })
+        .then(data => {
+            document.getElementById("online-players").innerText = data.playerCount;
+        })
+        .catch(error => {
+            document.getElementById("online-players").innerText = "Error";
+            console.error("Failed to fetch player count:", error);
+        });
+    setTimeout(updatePlayerCount, 10000);
+}
 
         function showPage(page) {
             if (userData[currentUser]?.isBanned) {
