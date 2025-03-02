@@ -16,6 +16,7 @@
             color: white;
             text-align: center;
             transition: all 0.3s;
+            position: relative; /* For music toggle positioning */
         }
 
         @keyframes gradientBG {
@@ -112,7 +113,7 @@
 
         .hidden { display: none; }
 
-        #leaderboard, #rules, #chat, #match-history, #admin-tools, #friends, #messages {
+        #leaderboard, #rules, #chat, #match-history, #admin-tools, #friends, #messages, #group-chat {
             margin: 20px auto;
             max-width: 450px;
             padding: 10px;
@@ -148,7 +149,7 @@
             100% { transform: scale(1); }
         }
 
-        #chat-box, #message-box {
+        #chat-box, #message-box, #group-chat-box {
             height: 150px;
             overflow-y: scroll;
             background: #111;
@@ -157,8 +158,18 @@
             margin-bottom: 10px;
         }
 
+        #music-toggle {
+            position: fixed;
+            bottom: 10px;
+            right: 10px;
+            background: rgba(0, 0, 0, 0.7);
+            padding: 10px;
+            border-radius: 5px;
+            box-shadow: 0 0 10px #ff0000;
+        }
+
         @media (max-width: 600px) {
-            .container, #leaderboard, #rules, #chat, #match-history, #admin-tools, #friends, #messages {
+            .container, #leaderboard, #rules, #chat, #match-history, #admin-tools, #friends, #messages, #group-chat {
                 max-width: 90%;
             }
             .button {
@@ -167,6 +178,7 @@
             }
             header img { height: 60px; }
             .search-bar { width: 150px; }
+            #music-toggle { padding: 5px; font-size: 12px; }
         }
     </style>
     <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&display=swap" rel="stylesheet">
@@ -183,6 +195,11 @@
     <main id="content">
         <section id="home">
             <h2>Join the Battle!</h2>
+            <select id="game-mode" class="input-field" style="margin: 10px auto; width: 200px;">
+                <option value="free-for-all">Free-for-All</option>
+                <option value="team-deathmatch">Team Deathmatch</option>
+                <option value="capture-the-flag">Capture the Flag</option>
+            </select>
             <button class="button" id="login-btn" onclick="playSound('click'); showPage('login-form')">Login</button>
             <button class="button" id="register-btn" onclick="playSound('click'); showPage('register-form')">Register</button>
             <button class="button hidden" id="profile-btn" onclick="playSound('click'); showPage('profile')">Profile</button>
@@ -194,6 +211,7 @@
             <button class="button hidden" id="friends-btn" onclick="playSound('click'); showPage('friends')">Friends</button>
             <button class="button hidden" id="messages-btn" onclick="playSound('click'); showPage('messages')">Messages</button>
             <button class="button hidden" id="matchmaking-btn" onclick="joinMatchmaking()">Join Matchmaking</button>
+            <button class="button hidden" id="group-chat-btn" onclick="playSound('click'); showPage('group-chat')">Group Chat</button>
             <button class="button hidden" id="logout-btn" onclick="logout()">Logout</button>
         </section>
         
@@ -215,10 +233,13 @@
 
         <div id="profile" class="container hidden">
             <h2>Profile</h2>
-            <p>Welcome, <span id="user-name">User</span>!</p>
+            <p>Welcome, <span id="user-name">User</span> <span id="user-badge"></span>!</p>
+            <p>Bio: <span id="user-bio">No bio set</span></p>
             <p>Games Played: <span id="games-played">0</span></p>
             <p>Kills: <input type="number" id="kills" class="input-field" value="0" min="0" onchange="updateStats()"></p>
             <p>Deaths: <input type="number" id="deaths" class="input-field" value="0" min="0" onchange="updateStats()"></p>
+            <p>K/D Ratio: <span id="kd-ratio">0.00</span></p>
+            <p>Win Rate: <span id="win-rate">0%</span></p>
             <div id="achievements"></div>
             <button class="button" onclick="fetchRealStats()">Refresh Stats</button>
             <button class="button" onclick="logout()">Logout</button>
@@ -232,12 +253,23 @@
             <button class="button" onclick="setTheme('neon-red')">Neon Red</button>
             <button class="button" onclick="setTheme('laser-blue')">Laser Blue</button>
             <button class="button" onclick="setTheme('cosmic')">Cosmic</button>
+            <h3>Button Color</h3>
+            <select id="button-color" class="input-field" onchange="setButtonColor()">
+                <option value="#ff0000">Red</option>
+                <option value="#00ff00">Green</option>
+                <option value="#0000ff">Blue</option>
+                <option value="#ff00ff">Purple</option>
+            </select>
             <h3>Account</h3>
             <input type="password" id="current-password" class="input-field" placeholder="Current Password">
             <input type="password" id="new-password" class="input-field" placeholder="New Password">
             <button class="button" onclick="changePassword()">Change Password</button>
-            <h3>Preferences</h3>
-            <label><input type="checkbox" id="mute-sounds" onchange="toggleMute()"> Mute Sounds</label><br>
+            <input type="text" id="bio-input" class="input-field" placeholder="Set your bio" maxlength="50">
+            <button class="button" onclick="setBio()">Update Bio</button>
+            <h3>Sound Preferences</h3>
+            <label><input type="checkbox" id="mute-click" onchange="updateSoundSettings()"> Mute Click</label><br>
+            <label><input type="checkbox" id="mute-fanfare" onchange="updateSoundSettings()"> Mute Fanfare</label><br>
+            <label><input type="checkbox" id="mute-ambient" onchange="updateSoundSettings()"> Mute Ambient</label><br>
             <button class="button" onclick="exportData()">Export Data</button>
             <button class="button" onclick="showPage('home')">Back</button>
         </div>
@@ -261,6 +293,9 @@
             <button class="button" onclick="resetUserStats()">Reset User Stats</button>
             <button class="button" onclick="massBan()">Mass Ban</button>
             <button class="button" onclick="massUnban()">Mass Unban</button>
+            <button class="button" onclick="broadcastMessage()">Broadcast Message</button>
+            <button class="button" onclick="clearChat()">Clear Chat</button>
+            <div id="reports" style="margin-top: 10px;"></div>
             <button class="button" onclick="showPage('home')">Back</button>
         </div>
 
@@ -278,6 +313,19 @@
             <div id="message-box"></div>
             <input type="text" id="message-input" class="input-field" placeholder="Type a private message...">
             <button class="button" onclick="sendPrivateMessage()">Send</button>
+            <button class="button" onclick="showPage('home')">Back</button>
+        </div>
+
+        <div id="group-chat" class="container hidden">
+            <h2>Group Chat</h2>
+            <input type="text" id="group-chat-name" class="input-field" placeholder="Group Name">
+            <button class="button" onclick="createGroupChat()">Create Group</button>
+            <select id="group-chat-select" class="input-field" onchange="switchGroupChat()">
+                <option value="">Select a group</option>
+            </select>
+            <div id="group-chat-box"></div>
+            <input type="text" id="group-chat-input" class="input-field" placeholder="Type a group message...">
+            <button class="button" onclick="sendGroupChat()">Send</button>
             <button class="button" onclick="showPage('home')">Back</button>
         </div>
 
@@ -299,16 +347,27 @@
         </div>
     </main>
     
+    <div id="music-toggle">
+        <label><input type="checkbox" id="mute-music" onchange="toggleMusic()"> Toggle Music</label>
+    </div>
+    
     <audio id="click-sound" src="https://www.myinstants.com/media/sounds/button-click.mp3" preload="auto"></audio>
     <audio id="fanfare-sound" src="https://www.myinstants.com/media/sounds/fanfare.mp3" preload="auto"></audio>
     <audio id="ambient-sound" src="https://www.myinstants.com/media/sounds/sci-fi-ambience.mp3" preload="auto" loop></audio>
+    <audio id="music" src="wedding_song.mp3" preload="auto" loop></audio>
     
     <script>
         let isLoggedIn = false;
         let currentUser = null;
         let userData = JSON.parse(localStorage.getItem('userData')) || {};
         let chatHistory = JSON.parse(localStorage.getItem('chatHistory')) || [];
-        let isMuted = false;
+        let groupChats = JSON.parse(localStorage.getItem('groupChats')) || {};
+        let soundSettings = JSON.parse(localStorage.getItem('soundSettings')) || {
+            click: true,
+            fanfare: true,
+            ambient: true,
+            music: true
+        };
         let matchmakingQueue = [];
 
         if (!userData['Halaldeveloper']) {
@@ -317,9 +376,13 @@
                 gamesPlayed: 0,
                 kills: 0,
                 deaths: 0,
+                wins: 0,
                 history: [],
                 friends: [],
                 messages: [],
+                reports: [],
+                bio: '',
+                lastLogin: null,
                 isAdmin: true,
                 isOwner: true,
                 isBanned: false,
@@ -329,24 +392,38 @@
         }
 
         window.onload = () => {
-            if (!isMuted) document.getElementById("ambient-sound").play().catch(() => console.log("Audio blocked by browser"));
+            currentUser = localStorage.getItem('currentUser');
+            isLoggedIn = !!currentUser && !!userData[currentUser];
+            document.getElementById("mute-click").checked = !soundSettings.click;
+            document.getElementById("mute-fanfare").checked = !soundSettings.fanfare;
+            document.getElementById("mute-ambient").checked = !soundSettings.ambient;
+            document.getElementById("mute-music").checked = !soundSettings.music;
+            if (soundSettings.ambient) document.getElementById("ambient-sound").play().catch(() => console.log("Audio blocked"));
+            if (soundSettings.music) document.getElementById("music").play().catch(() => console.log("Audio blocked"));
             loadChatHistory();
-            if (currentUser && userData[currentUser]) {
-                isLoggedIn = true;
+            if (isLoggedIn) {
                 updateUI();
                 updateProfile(currentUser);
+                checkDailyReward();
                 showPage('home');
             }
+        };
+
+        window.onbeforeunload = () => {
+            localStorage.setItem('userData', JSON.stringify(userData));
+            localStorage.setItem('chatHistory', JSON.stringify(chatHistory));
+            localStorage.setItem('groupChats', JSON.stringify(groupChats));
+            localStorage.setItem('soundSettings', JSON.stringify(soundSettings));
         };
 
         function showPage(page) {
             document.querySelectorAll("main section, .container").forEach(section => {
                 section.classList.add("hidden");
-                section.style.opacity = "0"; // Smooth fade out
+                section.style.opacity = "0";
             });
             const target = document.getElementById(page);
             target.classList.remove("hidden");
-            setTimeout(() => target.style.opacity = "1", 10); // Fade in
+            setTimeout(() => target.style.opacity = "1", 10);
             if (isLoggedIn && page === 'home') {
                 ['leaderboard', 'chat', 'match-history'].forEach(id => {
                     document.getElementById(id).classList.remove('hidden');
@@ -370,10 +447,12 @@
                 playSound('fanfare');
                 alert("Login successful!");
                 currentUser = username;
-                document.getElementById("user-name").innerText = username;
                 isLoggedIn = true;
+                localStorage.setItem('currentUser', currentUser);
+                document.getElementById("user-name").innerText = username;
                 updateUI();
                 updateProfile(username);
+                checkDailyReward();
                 showPage('home');
             } else {
                 alert("Invalid username or password.");
@@ -394,9 +473,13 @@
                     gamesPlayed: 0,
                     kills: 0,
                     deaths: 0,
+                    wins: 0,
                     history: [],
                     friends: [],
                     messages: [],
+                    reports: [],
+                    bio: '',
+                    lastLogin: null,
                     isAdmin: false,
                     isBanned: false,
                     banReason: ''
@@ -411,6 +494,7 @@
         function logout() {
             isLoggedIn = false;
             currentUser = null;
+            localStorage.removeItem('currentUser');
             playSound('click');
             alert("You have been logged out.");
             updateUI();
@@ -428,17 +512,28 @@
             document.getElementById("friends-btn").classList.toggle("hidden", !isLoggedIn);
             document.getElementById("messages-btn").classList.toggle("hidden", !isLoggedIn);
             document.getElementById("matchmaking-btn").classList.toggle("hidden", !isLoggedIn);
+            document.getElementById("group-chat-btn").classList.toggle("hidden", !isLoggedIn);
+            setButtonColor(); // Ensure button color persists
         }
 
         function updateProfile(username) {
+            document.getElementById("user-name").innerText = username;
+            document.getElementById("user-badge").innerText = userData[username].isOwner ? "👑" : userData[username].isAdmin ? "⭐" : "";
+            document.getElementById("user-bio").innerText = userData[username].bio || "No bio set";
             document.getElementById("games-played").innerText = userData[username].gamesPlayed || 0;
             document.getElementById("kills").value = userData[username].kills || 0;
             document.getElementById("deaths").value = userData[username].deaths || 0;
+            const kd = userData[username].deaths === 0 ? userData[username].kills : (userData[username].kills / userData[username].deaths).toFixed(2);
+            document.getElementById("kd-ratio").innerText = kd;
+            const winRate = userData[username].gamesPlayed === 0 ? 0 : ((userData[username].wins / userData[username].gamesPlayed) * 100).toFixed(0);
+            document.getElementById("win-rate").innerText = `${winRate}%`;
             updateLeaderboard();
             updateAchievements(username);
             updateMatchHistory(username);
             updateFriendList();
             updateMessages();
+            updateGroupChatSelect();
+            updateReports();
         }
 
         function updateStats() {
@@ -449,8 +544,7 @@
             userData[username].kills = kills;
             userData[username].deaths = deaths;
             localStorage.setItem('userData', JSON.stringify(userData));
-            updateLeaderboard();
-            updateAchievements(username);
+            updateProfile(username);
         }
 
         function setTheme(theme) {
@@ -459,26 +553,68 @@
             playSound('click');
         }
 
+        function setButtonColor() {
+            const color = document.getElementById("button-color").value;
+            document.querySelectorAll(".button").forEach(btn => {
+                btn.style.background = color;
+                btn.style.boxShadow = `0 0 10px ${color}`;
+                btn.onmouseover = () => {
+                    btn.style.background = darkenColor(color);
+                    btn.style.boxShadow = `0 0 20px ${color}`;
+                };
+                btn.onmouseout = () => {
+                    btn.style.background = color;
+                    btn.style.boxShadow = `0 0 10px ${color}`;
+                };
+            });
+            if (isLoggedIn) userData[currentUser].buttonColor = color;
+            localStorage.setItem('userData', JSON.stringify(userData));
+        }
+
+        function darkenColor(hex) {
+            let r = parseInt(hex.slice(1, 3), 16) * 0.8;
+            let g = parseInt(hex.slice(3, 5), 16) * 0.8;
+            let b = parseInt(hex.slice(5, 7), 16) * 0.8;
+            return `rgb(${Math.round(r)}, ${Math.round(g)}, ${Math.round(b)})`;
+        }
+
         function playSound(type) {
-            if (isMuted) return;
+            if (type === 'click' && !soundSettings.click) return;
+            if (type === 'fanfare' && !soundSettings.fanfare) return;
             const sound = document.getElementById(type === 'click' ? 'click-sound' : 'fanfare-sound');
             sound.currentTime = 0;
             sound.play().catch(() => console.log("Audio blocked by browser"));
         }
 
-        function toggleMute() {
-            isMuted = document.getElementById("mute-sounds").checked;
+        function updateSoundSettings() {
+            soundSettings.click = !document.getElementById("mute-click").checked;
+            soundSettings.fanfare = !document.getElementById("mute-fanfare").checked;
+            soundSettings.ambient = !document.getElementById("mute-ambient").checked;
+            soundSettings.music = !document.getElementById("mute-music").checked;
             const ambient = document.getElementById("ambient-sound");
-            if (isMuted) ambient.pause(); else ambient.play().catch(() => console.log("Audio blocked"));
+            const music = document.getElementById("music");
+            if (soundSettings.ambient) ambient.play().catch(() => console.log("Audio blocked")); else ambient.pause();
+            if (soundSettings.music) music.play().catch(() => console.log("Audio blocked")); else music.pause();
+            localStorage.setItem('soundSettings', JSON.stringify(soundSettings));
+        }
+
+        function toggleMusic() {
+            soundSettings.music = !document.getElementById("mute-music").checked;
+            const music = document.getElementById("music");
+            if (soundSettings.music) music.play().catch(() => console.log("Audio blocked")); else music.pause();
+            localStorage.setItem('soundSettings', JSON.stringify(soundSettings));
         }
 
         function launchRoblox() {
+            const mode = document.getElementById("game-mode").value;
             window.open("roblox://placeId=109363541562257", "_blank");
             userData[currentUser].gamesPlayed = (userData[currentUser].gamesPlayed || 0) + 1;
-            userData[currentUser].history.push(`Played on ${new Date().toLocaleString()}`);
+            userData[currentUser].history.push(`Played ${mode.replace('-', ' ')} on ${new Date().toLocaleString()}`);
+            if (Math.random() < 0.3) userData[currentUser].wins = (userData[currentUser].wins || 0) + 1; // Simulate 30% win chance
             localStorage.setItem('userData', JSON.stringify(userData));
             updateProfile(currentUser);
             playSound('fanfare');
+            alert(`Launching ${mode.replace('-', ' ')} mode! (Simulated)`);
         }
 
         function joinFriend() {
@@ -516,11 +652,38 @@
             for (let user in userData) {
                 if (user.toLowerCase().includes(query)) {
                     const status = userData[user].isBanned ? ` (Banned: ${userData[user].banReason || 'No reason'})` : userData[user].isAdmin ? " (Admin)" : "";
-                    alert(`Found: ${user}${status} - Kills: ${userData[user].kills}, Deaths: ${userData[user].deaths}`);
+                    const badge = userData[user].isOwner ? "👑" : userData[user].isAdmin ? "⭐" : "";
+                    alert(`Found: ${user}${badge}${status} - Kills: ${userData[user].kills}, Deaths: ${userData[user].deaths}\nBio: ${userData[user].bio || 'No bio'}\nReport this user?\nType "yes" to report.`);
+                    if (prompt("Report this user? (yes/no)").toLowerCase() === "yes") {
+                        reportUser(user);
+                    }
                     return;
                 }
             }
             alert("No user found matching your search.");
+        }
+
+        function reportUser(target) {
+            userData[target].reports.push({
+                from: currentUser,
+                reason: prompt("Reason for reporting this user:"),
+                time: new Date().toLocaleString()
+            });
+            localStorage.setItem('userData', JSON.stringify(userData));
+            alert(`${target} has been reported!`);
+            updateReports();
+        }
+
+        function updateReports() {
+            if (!userData[currentUser]?.isAdmin) return;
+            const reportsDiv = document.getElementById("reports");
+            let allReports = [];
+            for (let user in userData) {
+                if (userData[user].reports.length > 0) {
+                    allReports.push(`<p><b>${user}:</b></p>` + userData[user].reports.map(r => `<p>Reported by ${r.from}: ${r.reason} (${r.time})</p>`).join(''));
+                }
+            }
+            reportsDiv.innerHTML = allReports.length > 0 ? allReports.join('') : "<p>No reports yet.</p>";
         }
 
         function updateAchievements(username) {
@@ -530,12 +693,17 @@
             const games = userData[username].gamesPlayed;
             const kills = userData[username].kills;
             const deaths = userData[username].deaths;
+            const messages = userData[username].messages.length;
+            const friends = userData[username].friends.length;
             if (games >= 5) addAchievement(achievementsDiv, "🏆 Veteran: 5+ Games", oldAchievements);
             if (kills >= 10) addAchievement(achievementsDiv, "🔫 Sharpshooter: 10+ Kills", oldAchievements);
             if (deaths < 5 && games >= 5) addAchievement(achievementsDiv, "🛡️ Survivor: <5 Deaths in 5+ Games", oldAchievements);
             if (kills >= 20) addAchievement(achievementsDiv, "💀 Terminator: 20+ Kills", oldAchievements);
             if (games >= 10) addAchievement(achievementsDiv, "🌟 Elite: 10+ Games", oldAchievements);
             if (userData[username].isAdmin) addAchievement(achievementsDiv, "👑 Admin: Site Moderator", oldAchievements);
+            if (messages >= 50) addAchievement(achievementsDiv, "💬 Chat Master: 50+ Messages", oldAchievements);
+            if (friends >= 10) addAchievement(achievementsDiv, "🤝 Socialite: 10+ Friends", oldAchievements);
+            if (userData[username].wins >= 5) addAchievement(achievementsDiv, "🏅 Champion: 5+ Wins", oldAchievements);
         }
 
         function addAchievement(div, text, oldHTML) {
@@ -561,16 +729,39 @@
             localStorage.setItem('chatHistory', JSON.stringify(chatHistory));
             document.getElementById("chat-input").value = "";
             playSound('click');
-            document.getElementById("chat-box").scrollTop = document.getElementById("chat-box").scrollHeight; // Auto-scroll
+            document.getElementById("chat-box").scrollTop = document.getElementById("chat-box").scrollHeight;
         }
 
         function loadChatHistory() {
             document.getElementById("chat-box").innerHTML = chatHistory.join('');
         }
 
+        function broadcastMessage() {
+            if (!userData[currentUser]?.isAdmin) return alert("You are not an admin!");
+            const message = prompt("Enter broadcast message:").trim();
+            if (!message) return;
+            const broadcast = `<p><b>[BROADCAST] ${currentUser}:</b> ${message}</p>`;
+            chatHistory.push(broadcast);
+            document.getElementById("chat-box").innerHTML += broadcast;
+            localStorage.setItem('chatHistory', JSON.stringify(chatHistory));
+            alert("Message broadcasted!");
+            playSound('fanfare');
+        }
+
+        function clearChat() {
+            if (!userData[currentUser]?.isAdmin) return alert("You are not an admin!");
+            if (confirm("Are you sure you want to clear the chat history?")) {
+                chatHistory = [];
+                document.getElementById("chat-box").innerHTML = "";
+                localStorage.setItem('chatHistory', JSON.stringify(chatHistory));
+                alert("Chat history cleared!");
+                playSound('click');
+            }
+        }
+
         function updateMatchHistory(username) {
             const historyDiv = document.getElementById("history-list");
-            historyDiv.innerHTML = userData[username].history.map(match => `<p>${match}</p>`).join('');
+            historyDiv.innerHTML = userData[username].history.map(match => `<p>${match}</p>`).join('') || "<p>No matches yet.</p>";
         }
 
         function fetchRealStats() {
@@ -604,26 +795,61 @@
             }
         }
 
+        function setBio() {
+            const bio = document.getElementById("bio-input").value.trim();
+            if (bio.length > 50) return alert("Bio cannot exceed 50 characters!");
+            userData[currentUser].bio = bio;
+            localStorage.setItem('userData', JSON.stringify(userData));
+            updateProfile(currentUser);
+            alert("Bio updated!");
+            playSound('click');
+        }
+
+        function checkDailyReward() {
+            const today = new Date().toDateString();
+            if (userData[currentUser].lastLogin !== today) {
+                userData[currentUser].kills += 5;
+                userData[currentUser].lastLogin = today;
+                localStorage.setItem('userData', JSON.stringify(userData));
+                alert("Daily login reward: +5 kills!");
+                playSound('fanfare');
+                updateProfile(currentUser);
+            }
+        }
+
         function joinMatchmaking() {
             if (!isLoggedIn) return alert("You must be logged in to join matchmaking!");
-            if (matchmakingQueue.includes(currentUser)) {
+            if (matchmakingQueue.some(p => p.user === currentUser)) {
                 alert("You are already in the matchmaking queue!");
                 return;
             }
-            matchmakingQueue.push(currentUser);
-            alert("Added to matchmaking queue! Waiting for players...");
+            const mode = document.getElementById("game-mode").value;
+            matchmakingQueue.push({ user: currentUser, mode });
+            alert(`Added to ${mode.replace('-', ' ')} matchmaking queue! Waiting for players...`);
             playSound('click');
             setTimeout(checkMatchmaking, 5000);
         }
 
         function checkMatchmaking() {
             if (matchmakingQueue.length >= 2) {
-                const players = matchmakingQueue.splice(0, 2);
-                alert(`Match found! ${players.join(" vs ")} are now playing! (Simulated)`);
-                playSound('fanfare');
-            } else if (matchmakingQueue.length > 0) {
-                setTimeout(checkMatchmaking, 5000); // Keep checking
+                const modeGroups = {};
+                matchmakingQueue.forEach(player => {
+                    modeGroups[player.mode] = modeGroups[player.mode] || [];
+                    modeGroups[player.mode].push(player.user);
+                });
+                for (let mode in modeGroups) {
+                    if (modeGroups[mode].length >= 2) {
+                        const players = modeGroups[mode].splice(0, 2);
+                        matchmakingQueue = matchmakingQueue.filter(p => !players.includes(p.user));
+                        if (players.includes(currentUser)) {
+                            userData[currentUser].wins += Math.random() < 0.5 ? 1 : 0; // 50% win chance
+                        }
+                        alert(`Match found! ${players.join(" vs ")} in ${mode.replace('-', ' ')}! (Simulated)`);
+                        playSound('fanfare');
+                    }
+                }
             }
+            if (matchmakingQueue.length > 0) setTimeout(checkMatchmaking, 5000);
         }
 
         function addFriend() {
@@ -647,7 +873,51 @@
 
         function updateFriendList() {
             const friendList = document.getElementById("friend-list");
-            friendList.innerHTML = userData[currentUser].friends.map(f => `<p>${f}</p>`).join('') || "<p>No friends yet.</p>";
+            friendList.innerHTML = userData[currentUser].friends.map(f => {
+                const status = Math.random() < 0.5 ? "Online" : "In-Game";
+                return `<p>${f} - ${status}</p>`;
+            }).join('') || "<p>No friends yet.</p>";
+        }
+
+        function createGroupChat() {
+            const groupName = document.getElementById("group-chat-name").value.trim();
+            if (!groupName) return alert("Please enter a group name.");
+            if (groupChats[groupName]) return alert("Group already exists!");
+            groupChats[groupName] = [];
+            localStorage.setItem('groupChats', JSON.stringify(groupChats));
+            updateGroupChatSelect();
+            document.getElementById("group-chat-select").value = groupName;
+            switchGroupChat();
+            alert(`Group "${groupName}" created!`);
+            playSound('click');
+        }
+
+        function updateGroupChatSelect() {
+            const select = document.getElementById("group-chat-select");
+            select.innerHTML = "<option value=''>Select a group</option>" + Object.keys(groupChats).map(name => `<option value="${name}">${name}</option>`).join('');
+        }
+
+        function switchGroupChat() {
+            const groupName = document.getElementById("group-chat-select").value;
+            if (groupName) {
+                document.getElementById("group-chat-box").innerHTML = groupChats[groupName].join('');
+            } else {
+                document.getElementById("group-chat-box").innerHTML = "<p>Select a group to chat.</p>";
+            }
+        }
+
+        function sendGroupChat() {
+            const groupName = document.getElementById("group-chat-select").value;
+            const message = document.getElementById("group-chat-input").value.trim();
+            if (!groupName) return alert("Please select a group.");
+            if (!message) return alert("Please enter a message.");
+            const groupMessage = `<p><b>${currentUser}:</b> ${message}</p>`;
+            groupChats[groupName].push(groupMessage);
+            localStorage.setItem('groupChats', JSON.stringify(groupChats));
+            document.getElementById("group-chat-box").innerHTML += groupMessage;
+            document.getElementById("group-chat-input").value = "";
+            playSound('click');
+            document.getElementById("group-chat-box").scrollTop = document.getElementById("group-chat-box").scrollHeight;
         }
 
         function sendPrivateMessage() {
@@ -747,6 +1017,7 @@
                 userData[target].kills = 0;
                 userData[target].deaths = 0;
                 userData[target].gamesPlayed = 0;
+                userData[target].wins = 0;
                 userData[target].history = [];
                 localStorage.setItem('userData', JSON.stringify(userData));
                 alert(`${target}'s stats have been reset!`);
@@ -799,7 +1070,9 @@
         function exportData() {
             const data = {
                 userData: userData,
-                chatHistory: chatHistory
+                chatHistory: chatHistory,
+                groupChats: groupChats,
+                soundSettings: soundSettings
             };
             const json = JSON.stringify(data, null, 2);
             const blob = new Blob([json], { type: "application/json" });
