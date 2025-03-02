@@ -495,7 +495,7 @@
             document.getElementById("content").classList.add("hidden");
             document.getElementById("banned-notice").classList.remove("hidden");
             document.getElementById("ban-reason").innerText = userData[currentUser].banReason || "No reason provided";
-            localStorage.removeItem('currentUser'); // Clear banned user from persistent login
+            localStorage.removeItem('currentUser');
             isLoggedIn = false;
             currentUser = null;
         }
@@ -732,7 +732,7 @@
 
         function launchRoblox() {
             if (userData[currentUser]?.isBanned) return;
-            window.open("roblox://placeId=109363541562257", "_blank");
+            window.open("https://www.roblox.com/games/109363541562257/Laser-Tag", "_blank");
             userData[currentUser].gamesPlayed = (userData[currentUser].gamesPlayed || 0) + 1;
             const team = assignTeam(currentUser);
             userData[currentUser].history.push(`Played on ${team} team on ${new Date().toLocaleString()}`);
@@ -740,7 +740,7 @@
             localStorage.setItem('userData', JSON.stringify(userData));
             updateProfile(currentUser);
             playSound('fanfare');
-            alert(`Launching game on ${team} team! (Simulated)`);
+            alert(`Launching Laser Tag on ${team} team!`);
         }
 
         function joinFriend() {
