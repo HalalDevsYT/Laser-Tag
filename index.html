@@ -83,6 +83,12 @@
             box-shadow: 0 0 20px #ff0000;
         }
 
+        .friend-button {
+            padding: 8px 16px;
+            font-size: 14px;
+            margin: 5px;
+        }
+
         .container {
             max-width: 450px;
             margin: 20px auto;
@@ -175,6 +181,10 @@
             .button {
                 padding: 10px 20px;
                 font-size: 14px;
+            }
+            .friend-button {
+                padding: 6px 12px;
+                font-size: 12px;
             }
             header img { height: 60px; }
             .search-bar { width: 150px; }
@@ -476,6 +486,7 @@
             }
             if (page === 'group-chat' && isLoggedIn) populateGroupMembers();
             if (page === 'settings' && isLoggedIn) populateTitles();
+            if (page === 'friends' && isLoggedIn) updateFriendList();
         }
 
         function login() {
@@ -493,6 +504,9 @@
                 isLoggedIn = true;
                 localStorage.setItem('currentUser', currentUser);
                 document.getElementById("user-name").innerText = username;
+                userData[currentUser].friends.forEach(f => {
+                    if (userData[f]) alert(`${userData[f].activeTitle || "Rookie"} ${f} saw you log in!`);
+                });
                 updateUI();
                 updateProfile(username);
                 checkDailyReward();
@@ -607,7 +621,7 @@
 
         function setButtonColor() {
             const color = isLoggedIn && userData[currentUser].buttonColor ? userData[currentUser].buttonColor : document.getElementById("button-color").value;
-            document.querySelectorAll(".button").forEach(btn => {
+            document.querySelectorAll(".button, .friend-button").forEach(btn => {
                 btn.style.background = color;
                 btn.style.boxShadow = `0 0 10px ${color}`;
                 btn.onmouseover = () => {
@@ -728,7 +742,8 @@
                     const status = userData[user].isBanned ? ` (Banned: ${userData[user].banReason || 'No reason'})` : userData[user].isAdmin ? " (Admin)" : "";
                     const badge = userData[user].isOwner ? "👑" : userData[user].isAdmin ? "⭐" : "";
                     const title = userData[user].activeTitle || "Rookie";
-                    alert(`Found: ${title} ${user}${badge}${status} - Kills: ${userData[user].kills}, Deaths: ${userData[user].deaths}\nBio: ${userData[user].bio || 'No bio'}\nReport this user?\nType "yes" to report.`);
+                    const team = userData[user].team ? `Team: ${userData[user].team}` : "No team";
+                    alert(`Found: ${title} ${user}${badge}${status} - Kills: ${userData[user].kills}, Deaths: ${userData[user].deaths}\n${team}\nBio: ${userData[user].bio || 'No bio'}\nReport this user?\nType "yes" to report.`);
                     if (prompt("Report this user? (yes/no)").toLowerCase() === "yes") {
                         reportUser(user);
                     }
@@ -837,7 +852,7 @@
             if (emote) {
                 const input = document.getElementById(inputId);
                 input.value += ` ${emote}`;
-                select.value = ""; // Reset dropdown
+                select.value = "";
             }
         }
 
@@ -949,6 +964,9 @@
             }
             const team = assignTeam(currentUser);
             matchmakingQueue.push(currentUser);
+            userData[currentUser].friends.forEach(f => {
+                if (userData[f]) alert(`${userData[currentUser].activeTitle || "Rookie"} ${currentUser} joined matchmaking on ${team} team!`);
+            });
             alert(`Added to matchmaking queue on ${team} team! Waiting for players...`);
             playSound('click');
             setTimeout(checkMatchmaking, 5000);
@@ -991,12 +1009,46 @@
             }
         }
 
+        function removeFriend(friend) {
+            if (confirm(`Are you sure you want to remove ${friend} from your friends list?`)) {
+                userData[currentUser].friends = userData[currentUser].friends.filter(f => f !== friend);
+                localStorage.setItem('userData', JSON.stringify(userData));
+                updateFriendList();
+                alert(`${friend} removed from your friends list!`);
+                playSound('click');
+                checkEmptyGroups();
+            }
+        }
+
+        function inviteFriendToGroup(friend) {
+            const groupName = prompt(`Enter group chat name to invite ${friend} to:`).trim();
+            if (!groupName || !groupChats[groupName]) {
+                alert("Please enter a valid group chat name that exists!");
+                return;
+            }
+            if (!groupChats[groupName].members.includes(currentUser)) {
+                alert("You must be a member of the group to invite others!");
+                return;
+            }
+            if (groupChats[groupName].members.includes(friend)) {
+                alert(`${friend} is already in this group!`);
+                return;
+            }
+            groupChats[groupName].members.push(friend);
+            localStorage.setItem('groupChats', JSON.stringify(groupChats));
+            alert(`${friend} invited to "${groupName}"!`);
+            playSound('click');
+        }
+
         function updateFriendList() {
             const friendList = document.getElementById("friend-list");
             friendList.innerHTML = userData[currentUser].friends.map(f => {
                 const status = Math.random() < 0.5 ? "Online" : "In-Game";
                 const title = userData[f].activeTitle || "Rookie";
-                return `<p>${title} ${f} - ${status}</p>`;
+                const team = userData[f].team ? userData[f].team : "None";
+                return `<p>${title} ${f} - ${status} (Team: ${team}) 
+                    <button class="friend-button" onclick="inviteFriendToGroup('${f}')">Invite</button>
+                    <button class="friend-button" onclick="removeFriend('${f}')">Remove</button></p>`;
             }).join('') || "<p>No friends yet.</p>";
         }
 
