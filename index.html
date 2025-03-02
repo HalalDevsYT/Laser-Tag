@@ -16,7 +16,7 @@
             color: white;
             text-align: center;
             transition: all 0.3s;
-            position: relative; /* For music toggle positioning */
+            position: relative;
         }
 
         @keyframes gradientBG {
@@ -195,11 +195,6 @@
     <main id="content">
         <section id="home">
             <h2>Join the Battle!</h2>
-            <select id="game-mode" class="input-field" style="margin: 10px auto; width: 200px;">
-                <option value="free-for-all">Free-for-All</option>
-                <option value="team-deathmatch">Team Deathmatch</option>
-                <option value="capture-the-flag">Capture the Flag</option>
-            </select>
             <button class="button" id="login-btn" onclick="playSound('click'); showPage('login-form')">Login</button>
             <button class="button" id="register-btn" onclick="playSound('click'); showPage('register-form')">Register</button>
             <button class="button hidden" id="profile-btn" onclick="playSound('click'); showPage('profile')">Profile</button>
@@ -369,6 +364,13 @@
             music: true
         };
         let matchmakingQueue = [];
+        const teams = {
+            red: [],
+            pink: [],
+            green: []
+        };
+        const teamOrder = ['red', 'pink', 'green'];
+        const maxTeamSize = 6;
 
         if (!userData['Halaldeveloper']) {
             userData['Halaldeveloper'] = {
@@ -383,6 +385,7 @@
                 reports: [],
                 bio: '',
                 lastLogin: null,
+                team: null,
                 isAdmin: true,
                 isOwner: true,
                 isBanned: false,
@@ -480,6 +483,7 @@
                     reports: [],
                     bio: '',
                     lastLogin: null,
+                    team: null,
                     isAdmin: false,
                     isBanned: false,
                     banReason: ''
@@ -492,6 +496,10 @@
         }
 
         function logout() {
+            if (userData[currentUser].team) {
+                teams[userData[currentUser].team] = teams[userData[currentUser].team].filter(u => u !== currentUser);
+                userData[currentUser].team = null;
+            }
             isLoggedIn = false;
             currentUser = null;
             localStorage.removeItem('currentUser');
@@ -513,7 +521,7 @@
             document.getElementById("messages-btn").classList.toggle("hidden", !isLoggedIn);
             document.getElementById("matchmaking-btn").classList.toggle("hidden", !isLoggedIn);
             document.getElementById("group-chat-btn").classList.toggle("hidden", !isLoggedIn);
-            setButtonColor(); // Ensure button color persists
+            setButtonColor();
         }
 
         function updateProfile(username) {
@@ -554,7 +562,7 @@
         }
 
         function setButtonColor() {
-            const color = document.getElementById("button-color").value;
+            const color = isLoggedIn && userData[currentUser].buttonColor ? userData[currentUser].buttonColor : document.getElementById("button-color").value;
             document.querySelectorAll(".button").forEach(btn => {
                 btn.style.background = color;
                 btn.style.boxShadow = `0 0 10px ${color}`;
@@ -567,8 +575,10 @@
                     btn.style.boxShadow = `0 0 10px ${color}`;
                 };
             });
-            if (isLoggedIn) userData[currentUser].buttonColor = color;
-            localStorage.setItem('userData', JSON.stringify(userData));
+            if (isLoggedIn) {
+                userData[currentUser].buttonColor = color;
+                localStorage.setItem('userData', JSON.stringify(userData));
+            }
         }
 
         function darkenColor(hex) {
@@ -606,15 +616,15 @@
         }
 
         function launchRoblox() {
-            const mode = document.getElementById("game-mode").value;
             window.open("roblox://placeId=109363541562257", "_blank");
             userData[currentUser].gamesPlayed = (userData[currentUser].gamesPlayed || 0) + 1;
-            userData[currentUser].history.push(`Played ${mode.replace('-', ' ')} on ${new Date().toLocaleString()}`);
-            if (Math.random() < 0.3) userData[currentUser].wins = (userData[currentUser].wins || 0) + 1; // Simulate 30% win chance
+            const team = assignTeam(currentUser);
+            userData[currentUser].history.push(`Played on ${team} team on ${new Date().toLocaleString()}`);
+            if (Math.random() < 0.3) userData[currentUser].wins = (userData[currentUser].wins || 0) + 1;
             localStorage.setItem('userData', JSON.stringify(userData));
             updateProfile(currentUser);
             playSound('fanfare');
-            alert(`Launching ${mode.replace('-', ' ')} mode! (Simulated)`);
+            alert(`Launching game on ${team} team! (Simulated)`);
         }
 
         function joinFriend() {
@@ -625,11 +635,31 @@
                     alert(`${friend} is banned and cannot be joined!`);
                     return;
                 }
-                alert(`Joining ${friend}'s game! (Simulated)`);
+                const team = userData[friend].team || assignTeam(currentUser);
+                userData[currentUser].team = team;
+                teams[team].push(currentUser);
+                alert(`Joining ${friend}'s game on ${team} team! (Simulated)`);
                 playSound('fanfare');
             } else {
                 alert("Friend not found!");
             }
+        }
+
+        function assignTeam(username) {
+            if (userData[username].team) {
+                if (teams[userData[username].team].length < maxTeamSize) return userData[username].team;
+                teams[userData[username].team] = teams[userData[username].team].filter(u => u !== username);
+            }
+            const totalPlayers = teams.red.length + teams.pink.length + teams.green.length;
+            const teamIndex = totalPlayers % 3;
+            const team = teamOrder[teamIndex];
+            if (teams[team].length < maxTeamSize) {
+                teams[team].push(username);
+                userData[username].team = team;
+                localStorage.setItem('userData', JSON.stringify(userData));
+                return team;
+            }
+            return assignTeam(username); // Recursively find a spot (unlikely with simulation)
         }
 
         function updateLeaderboard() {
@@ -819,37 +849,33 @@
 
         function joinMatchmaking() {
             if (!isLoggedIn) return alert("You must be logged in to join matchmaking!");
-            if (matchmakingQueue.some(p => p.user === currentUser)) {
+            if (matchmakingQueue.includes(currentUser)) {
                 alert("You are already in the matchmaking queue!");
                 return;
             }
-            const mode = document.getElementById("game-mode").value;
-            matchmakingQueue.push({ user: currentUser, mode });
-            alert(`Added to ${mode.replace('-', ' ')} matchmaking queue! Waiting for players...`);
+            const team = assignTeam(currentUser);
+            matchmakingQueue.push(currentUser);
+            alert(`Added to matchmaking queue on ${team} team! Waiting for players...`);
             playSound('click');
             setTimeout(checkMatchmaking, 5000);
         }
 
         function checkMatchmaking() {
-            if (matchmakingQueue.length >= 2) {
-                const modeGroups = {};
-                matchmakingQueue.forEach(player => {
-                    modeGroups[player.mode] = modeGroups[player.mode] || [];
-                    modeGroups[player.mode].push(player.user);
-                });
-                for (let mode in modeGroups) {
-                    if (modeGroups[mode].length >= 2) {
-                        const players = modeGroups[mode].splice(0, 2);
-                        matchmakingQueue = matchmakingQueue.filter(p => !players.includes(p.user));
-                        if (players.includes(currentUser)) {
-                            userData[currentUser].wins += Math.random() < 0.5 ? 1 : 0; // 50% win chance
-                        }
-                        alert(`Match found! ${players.join(" vs ")} in ${mode.replace('-', ' ')}! (Simulated)`);
-                        playSound('fanfare');
-                    }
-                }
+            const totalPlayers = teams.red.length + teams.pink.length + teams.green.length;
+            if (totalPlayers >= 18) { // Full server: 3 teams x 6 players
+                alert(`Match started! Teams - Red: ${teams.red.join(', ')}, Pink: ${teams.pink.join(', ')}, Green: ${teams.green.join(', ')}`);
+                teams.red.forEach(u => { if (Math.random() < 0.33) userData[u].wins += 1; });
+                teams.pink.forEach(u => { if (Math.random() < 0.33) userData[u].wins += 1; });
+                teams.green.forEach(u => { if (Math.random() < 0.33) userData[u].wins += 1; });
+                matchmakingQueue = [];
+                for (let user in userData) userData[user].team = null;
+                teams.red = []; teams.pink = []; teams.green = [];
+                localStorage.setItem('userData', JSON.stringify(userData));
+                playSound('fanfare');
+                if (currentUser) updateProfile(currentUser);
+            } else if (matchmakingQueue.length > 0) {
+                setTimeout(checkMatchmaking, 5000); // Keep checking
             }
-            if (matchmakingQueue.length > 0) setTimeout(checkMatchmaking, 5000);
         }
 
         function addFriend() {
@@ -953,6 +979,8 @@
                 if (userData[target].isOwner) return alert("You cannot ban the owner!");
                 userData[target].isBanned = true;
                 userData[target].banReason = reason || "No reason provided";
+                if (userData[target].team) teams[userData[target].team] = teams[userData[target].team].filter(u => u !== target);
+                userData[target].team = null;
                 localStorage.setItem('userData', JSON.stringify(userData));
                 alert(`${target} has been banned! Reason: ${userData[target].banReason}`);
                 playSound('click');
@@ -1039,6 +1067,8 @@
                 if (userData[target] && target !== currentUser && !userData[target].isOwner) {
                     userData[target].isBanned = true;
                     userData[target].banReason = reason || "Mass ban - no reason provided";
+                    if (userData[target].team) teams[userData[target].team] = teams[userData[target].team].filter(u => u !== target);
+                    userData[target].team = null;
                     banned.push(target);
                 }
             });
@@ -1072,7 +1102,8 @@
                 userData: userData,
                 chatHistory: chatHistory,
                 groupChats: groupChats,
-                soundSettings: soundSettings
+                soundSettings: soundSettings,
+                teams: teams
             };
             const json = JSON.stringify(data, null, 2);
             const blob = new Blob([json], { type: "application/json" });
