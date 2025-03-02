@@ -186,6 +186,11 @@
             z-index: 1000;
         }
 
+        #player-count {
+            font-size: 18px;
+            margin: 10px 0;
+        }
+
         @media (max-width: 600px) {
             .container, #leaderboard, #rules, #chat, #match-history, #admin-tools, #friends, #messages, #group-chat {
                 max-width: 90%;
@@ -217,6 +222,7 @@
     <main id="content">
         <section id="home">
             <h2>Join the Battle!</h2>
+            <p id="player-count">Players Online: <span id="online-players">Loading...</span></p>
             <button class="button" id="login-btn" onclick="playSound('click'); showPage('login-form')">Login</button>
             <button class="button" id="register-btn" onclick="playSound('click'); showPage('register-form')">Register</button>
             <button class="button hidden" id="profile-btn" onclick="playSound('click'); showPage('profile')">Profile</button>
@@ -433,6 +439,7 @@
             ":heart:": "❤️",
             ":laugh:": "😂"
         };
+        const universeId = "6558675549"; // Your provided Universe ID
 
         if (!userData['Halaldeveloper']) {
             userData['Halaldeveloper'] = {
@@ -471,6 +478,7 @@
                 if (soundSettings.ambient) document.getElementById("ambient-sound").play().catch(() => console.log("Audio blocked"));
                 if (soundSettings.music) document.getElementById("music").play().catch(() => console.log("Audio blocked"));
                 loadChatHistory();
+                updatePlayerCount();
                 if (isLoggedIn) {
                     updateUI();
                     updateProfile(currentUser);
@@ -498,6 +506,13 @@
             localStorage.removeItem('currentUser');
             isLoggedIn = false;
             currentUser = null;
+        }
+
+        function updatePlayerCount() {
+            // Simulated for now; replace with real API call after backend setup
+            const playerCount = Math.floor(Math.random() * 50); // Random 0-50
+            document.getElementById("online-players").innerText = playerCount;
+            setTimeout(updatePlayerCount, 10000); // Update every 10 seconds
         }
 
         function showPage(page) {
