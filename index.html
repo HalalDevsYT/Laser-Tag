@@ -228,7 +228,7 @@
 
         <div id="profile" class="container hidden">
             <h2>Profile</h2>
-            <p>Welcome, <span id="user-name">User</span> <span id="user-badge"></span>!</p>
+            <p>Welcome, <span id="user-title">Rookie</span> <span id="user-name">User</span> <span id="user-badge"></span>!</p>
             <p>Bio: <span id="user-bio">No bio set</span></p>
             <p>Games Played: <span id="games-played">0</span></p>
             <p>Kills: <input type="number" id="kills" class="input-field" value="0" min="0" onchange="updateStats()"></p>
@@ -261,6 +261,8 @@
             <button class="button" onclick="changePassword()">Change Password</button>
             <input type="text" id="bio-input" class="input-field" placeholder="Set your bio" maxlength="50">
             <button class="button" onclick="setBio()">Update Bio</button>
+            <h3>Title</h3>
+            <select id="title-select" class="input-field" onchange="setTitle()"></select>
             <h3>Sound Preferences</h3>
             <label><input type="checkbox" id="mute-click" onchange="updateSoundSettings()"> Mute Click</label><br>
             <label><input type="checkbox" id="mute-fanfare" onchange="updateSoundSettings()"> Mute Fanfare</label><br>
@@ -307,6 +309,14 @@
             <input type="text" id="message-recipient" class="input-field" placeholder="Recipient Username">
             <div id="message-box"></div>
             <input type="text" id="message-input" class="input-field" placeholder="Type a private message...">
+            <select id="emote-select-message" class="input-field" onchange="addEmote('message-input')">
+                <option value="">Add Emote</option>
+                <option value=":smile:">😊</option>
+                <option value=":fire:">🔥</option>
+                <option value=":thumbsup:">👍</option>
+                <option value=":heart:">❤️</option>
+                <option value=":laugh:">😂</option>
+            </select>
             <button class="button" onclick="sendPrivateMessage()">Send</button>
             <button class="button" onclick="showPage('home')">Back</button>
         </div>
@@ -314,12 +324,21 @@
         <div id="group-chat" class="container hidden">
             <h2>Group Chat</h2>
             <input type="text" id="group-chat-name" class="input-field" placeholder="Group Name">
+            <select id="group-members" class="input-field" multiple style="height: 100px;"></select>
             <button class="button" onclick="createGroupChat()">Create Group</button>
             <select id="group-chat-select" class="input-field" onchange="switchGroupChat()">
                 <option value="">Select a group</option>
             </select>
             <div id="group-chat-box"></div>
             <input type="text" id="group-chat-input" class="input-field" placeholder="Type a group message...">
+            <select id="emote-select-group" class="input-field" onchange="addEmote('group-chat-input')">
+                <option value="">Add Emote</option>
+                <option value=":smile:">😊</option>
+                <option value=":fire:">🔥</option>
+                <option value=":thumbsup:">👍</option>
+                <option value=":heart:">❤️</option>
+                <option value=":laugh:">😂</option>
+            </select>
             <button class="button" onclick="sendGroupChat()">Send</button>
             <button class="button" onclick="showPage('home')">Back</button>
         </div>
@@ -333,6 +352,14 @@
             <h3>Chat</h3>
             <div id="chat-box"></div>
             <input type="text" id="chat-input" class="input-field" placeholder="Type a message...">
+            <select id="emote-select-chat" class="input-field" onchange="addEmote('chat-input')">
+                <option value="">Add Emote</option>
+                <option value=":smile:">😊</option>
+                <option value=":fire:">🔥</option>
+                <option value=":thumbsup:">👍</option>
+                <option value=":heart:">❤️</option>
+                <option value=":laugh:">😂</option>
+            </select>
             <button class="button" onclick="sendChat()">Send</button>
         </div>
 
@@ -371,6 +398,13 @@
         };
         const teamOrder = ['red', 'pink', 'green'];
         const maxTeamSize = 6;
+        const emotes = {
+            ":smile:": "😊",
+            ":fire:": "🔥",
+            ":thumbsup:": "👍",
+            ":heart:": "❤️",
+            ":laugh:": "😂"
+        };
 
         if (!userData['Halaldeveloper']) {
             userData['Halaldeveloper'] = {
@@ -386,6 +420,8 @@
                 bio: '',
                 lastLogin: null,
                 team: null,
+                titles: ["Rookie"],
+                activeTitle: "Rookie",
                 isAdmin: true,
                 isOwner: true,
                 isBanned: false,
@@ -408,6 +444,8 @@
                 updateUI();
                 updateProfile(currentUser);
                 checkDailyReward();
+                populateGroupMembers();
+                populateTitles();
                 showPage('home');
             }
         };
@@ -436,6 +474,8 @@
                     document.getElementById(id).classList.add('hidden');
                 });
             }
+            if (page === 'group-chat' && isLoggedIn) populateGroupMembers();
+            if (page === 'settings' && isLoggedIn) populateTitles();
         }
 
         function login() {
@@ -484,6 +524,8 @@
                     bio: '',
                     lastLogin: null,
                     team: null,
+                    titles: ["Rookie"],
+                    activeTitle: "Rookie",
                     isAdmin: false,
                     isBanned: false,
                     banReason: ''
@@ -525,6 +567,7 @@
         }
 
         function updateProfile(username) {
+            document.getElementById("user-title").innerText = userData[username].activeTitle || "Rookie";
             document.getElementById("user-name").innerText = username;
             document.getElementById("user-badge").innerText = userData[username].isOwner ? "👑" : userData[username].isAdmin ? "⭐" : "";
             document.getElementById("user-bio").innerText = userData[username].bio || "No bio set";
@@ -542,6 +585,7 @@
             updateMessages();
             updateGroupChatSelect();
             updateReports();
+            populateTitles();
         }
 
         function updateStats() {
@@ -659,7 +703,7 @@
                 localStorage.setItem('userData', JSON.stringify(userData));
                 return team;
             }
-            return assignTeam(username); // Recursively find a spot (unlikely with simulation)
+            return assignTeam(username);
         }
 
         function updateLeaderboard() {
@@ -683,7 +727,8 @@
                 if (user.toLowerCase().includes(query)) {
                     const status = userData[user].isBanned ? ` (Banned: ${userData[user].banReason || 'No reason'})` : userData[user].isAdmin ? " (Admin)" : "";
                     const badge = userData[user].isOwner ? "👑" : userData[user].isAdmin ? "⭐" : "";
-                    alert(`Found: ${user}${badge}${status} - Kills: ${userData[user].kills}, Deaths: ${userData[user].deaths}\nBio: ${userData[user].bio || 'No bio'}\nReport this user?\nType "yes" to report.`);
+                    const title = userData[user].activeTitle || "Rookie";
+                    alert(`Found: ${title} ${user}${badge}${status} - Kills: ${userData[user].kills}, Deaths: ${userData[user].deaths}\nBio: ${userData[user].bio || 'No bio'}\nReport this user?\nType "yes" to report.`);
                     if (prompt("Report this user? (yes/no)").toLowerCase() === "yes") {
                         reportUser(user);
                     }
@@ -725,6 +770,17 @@
             const deaths = userData[username].deaths;
             const messages = userData[username].messages.length;
             const friends = userData[username].friends.length;
+            const titles = userData[username].titles;
+
+            if (games >= 5 && !titles.includes("Veteran")) titles.push("Veteran");
+            if (kills >= 10 && !titles.includes("Sharpshooter")) titles.push("Sharpshooter");
+            if (deaths < 5 && games >= 5 && !titles.includes("Survivor")) titles.push("Survivor");
+            if (kills >= 20 && !titles.includes("Terminator")) titles.push("Terminator");
+            if (games >= 10 && !titles.includes("Elite")) titles.push("Elite");
+            if (messages >= 50 && !titles.includes("Chat Master")) titles.push("Chat Master");
+            if (friends >= 10 && !titles.includes("Socialite")) titles.push("Socialite");
+            if (userData[username].wins >= 5 && !titles.includes("Champion")) titles.push("Champion");
+
             if (games >= 5) addAchievement(achievementsDiv, "🏆 Veteran: 5+ Games", oldAchievements);
             if (kills >= 10) addAchievement(achievementsDiv, "🔫 Sharpshooter: 10+ Kills", oldAchievements);
             if (deaths < 5 && games >= 5) addAchievement(achievementsDiv, "🛡️ Survivor: <5 Deaths in 5+ Games", oldAchievements);
@@ -734,6 +790,8 @@
             if (messages >= 50) addAchievement(achievementsDiv, "💬 Chat Master: 50+ Messages", oldAchievements);
             if (friends >= 10) addAchievement(achievementsDiv, "🤝 Socialite: 10+ Friends", oldAchievements);
             if (userData[username].wins >= 5) addAchievement(achievementsDiv, "🏅 Champion: 5+ Wins", oldAchievements);
+
+            localStorage.setItem('userData', JSON.stringify(userData));
         }
 
         function addAchievement(div, text, oldHTML) {
@@ -749,11 +807,46 @@
             }
         }
 
+        function populateTitles() {
+            const select = document.getElementById("title-select");
+            select.innerHTML = userData[currentUser].titles.map(title => 
+                `<option value="${title}" ${userData[currentUser].activeTitle === title ? 'selected' : ''}>${title}</option>`
+            ).join('');
+        }
+
+        function setTitle() {
+            const title = document.getElementById("title-select").value;
+            userData[currentUser].activeTitle = title;
+            localStorage.setItem('userData', JSON.stringify(userData));
+            updateProfile(currentUser);
+            alert(`Title set to "${title}"!`);
+            playSound('click');
+        }
+
+        function replaceEmotes(text) {
+            let result = text;
+            for (let [shortcut, emoji] of Object.entries(emotes)) {
+                result = result.replace(new RegExp(shortcut, 'g'), emoji);
+            }
+            return result;
+        }
+
+        function addEmote(inputId) {
+            const select = document.getElementById(`emote-select-${inputId.split('-')[1]}`);
+            const emote = select.value;
+            if (emote) {
+                const input = document.getElementById(inputId);
+                input.value += ` ${emote}`;
+                select.value = ""; // Reset dropdown
+            }
+        }
+
         function sendChat() {
             const message = document.getElementById("chat-input").value.trim();
             if (!message) return alert("Please enter a message.");
             if (!isLoggedIn) return alert("You must be logged in to chat.");
-            const chatMessage = `<p><b>${currentUser}:</b> ${message}</p>`;
+            const title = userData[currentUser].activeTitle || "Rookie";
+            const chatMessage = `<p><b>${title} ${currentUser}:</b> ${replaceEmotes(message)}</p>`;
             document.getElementById("chat-box").innerHTML += chatMessage;
             chatHistory.push(chatMessage);
             localStorage.setItem('chatHistory', JSON.stringify(chatHistory));
@@ -770,7 +863,8 @@
             if (!userData[currentUser]?.isAdmin) return alert("You are not an admin!");
             const message = prompt("Enter broadcast message:").trim();
             if (!message) return;
-            const broadcast = `<p><b>[BROADCAST] ${currentUser}:</b> ${message}</p>`;
+            const title = userData[currentUser].activeTitle || "Rookie";
+            const broadcast = `<p><b>[BROADCAST] ${title} ${currentUser}:</b> ${replaceEmotes(message)}</p>`;
             chatHistory.push(broadcast);
             document.getElementById("chat-box").innerHTML += broadcast;
             localStorage.setItem('chatHistory', JSON.stringify(chatHistory));
@@ -862,7 +956,7 @@
 
         function checkMatchmaking() {
             const totalPlayers = teams.red.length + teams.pink.length + teams.green.length;
-            if (totalPlayers >= 18) { // Full server: 3 teams x 6 players
+            if (totalPlayers >= 18) {
                 alert(`Match started! Teams - Red: ${teams.red.join(', ')}, Pink: ${teams.pink.join(', ')}, Green: ${teams.green.join(', ')}`);
                 teams.red.forEach(u => { if (Math.random() < 0.33) userData[u].wins += 1; });
                 teams.pink.forEach(u => { if (Math.random() < 0.33) userData[u].wins += 1; });
@@ -874,7 +968,7 @@
                 playSound('fanfare');
                 if (currentUser) updateProfile(currentUser);
             } else if (matchmakingQueue.length > 0) {
-                setTimeout(checkMatchmaking, 5000); // Keep checking
+                setTimeout(checkMatchmaking, 5000);
             }
         }
 
@@ -901,21 +995,50 @@
             const friendList = document.getElementById("friend-list");
             friendList.innerHTML = userData[currentUser].friends.map(f => {
                 const status = Math.random() < 0.5 ? "Online" : "In-Game";
-                return `<p>${f} - ${status}</p>`;
+                const title = userData[f].activeTitle || "Rookie";
+                return `<p>${title} ${f} - ${status}</p>`;
             }).join('') || "<p>No friends yet.</p>";
+        }
+
+        function populateGroupMembers() {
+            const select = document.getElementById("group-members");
+            select.innerHTML = userData[currentUser].friends.map(f => `<option value="${f}">${f}</option>`).join('') || "<option value=''>No friends to add</option>";
         }
 
         function createGroupChat() {
             const groupName = document.getElementById("group-chat-name").value.trim();
             if (!groupName) return alert("Please enter a group name.");
             if (groupChats[groupName]) return alert("Group already exists!");
-            groupChats[groupName] = [];
+            const membersSelect = document.getElementById("group-members");
+            const selectedMembers = Array.from(membersSelect.selectedOptions).map(option => option.value);
+            if (selectedMembers.length === 0 || (selectedMembers.length === 1 && selectedMembers[0] === '')) {
+                alert("You must add at least one friend to the group chat!");
+                return;
+            }
+            groupChats[groupName] = {
+                messages: [],
+                members: [currentUser, ...selectedMembers]
+            };
             localStorage.setItem('groupChats', JSON.stringify(groupChats));
             updateGroupChatSelect();
             document.getElementById("group-chat-select").value = groupName;
             switchGroupChat();
-            alert(`Group "${groupName}" created!`);
+            alert(`Group "${groupName}" created with members: ${groupChats[groupName].members.join(', ')}!`);
             playSound('click');
+            checkEmptyGroups();
+        }
+
+        function checkEmptyGroups() {
+            for (let groupName in groupChats) {
+                const members = groupChats[groupName].members.filter(m => userData[m] && !userData[m].isBanned);
+                if (members.length <= 1) {
+                    delete groupChats[groupName];
+                    alert(`Group "${groupName}" removed due to insufficient members!`);
+                    playSound('click');
+                }
+            }
+            localStorage.setItem('groupChats', JSON.stringify(groupChats));
+            updateGroupChatSelect();
         }
 
         function updateGroupChatSelect() {
@@ -925,8 +1048,8 @@
 
         function switchGroupChat() {
             const groupName = document.getElementById("group-chat-select").value;
-            if (groupName) {
-                document.getElementById("group-chat-box").innerHTML = groupChats[groupName].join('');
+            if (groupName && groupChats[groupName]) {
+                document.getElementById("group-chat-box").innerHTML = groupChats[groupName].messages.join('');
             } else {
                 document.getElementById("group-chat-box").innerHTML = "<p>Select a group to chat.</p>";
             }
@@ -937,8 +1060,10 @@
             const message = document.getElementById("group-chat-input").value.trim();
             if (!groupName) return alert("Please select a group.");
             if (!message) return alert("Please enter a message.");
-            const groupMessage = `<p><b>${currentUser}:</b> ${message}</p>`;
-            groupChats[groupName].push(groupMessage);
+            if (!groupChats[groupName].members.includes(currentUser)) return alert("You are not a member of this group!");
+            const title = userData[currentUser].activeTitle || "Rookie";
+            const groupMessage = `<p><b>${title} ${currentUser}:</b> ${replaceEmotes(message)}</p>`;
+            groupChats[groupName].messages.push(groupMessage);
             localStorage.setItem('groupChats', JSON.stringify(groupChats));
             document.getElementById("group-chat-box").innerHTML += groupMessage;
             document.getElementById("group-chat-input").value = "";
@@ -951,7 +1076,8 @@
             const message = document.getElementById("message-input").value.trim();
             if (!recipient || !message) return alert("Please enter a recipient and message.");
             if (userData[recipient]) {
-                const msg = { from: currentUser, text: message, time: new Date().toLocaleString() };
+                const title = userData[currentUser].activeTitle || "Rookie";
+                const msg = { from: currentUser, text: replaceEmotes(message), time: new Date().toLocaleString(), title: title };
                 userData[recipient].messages.push(msg);
                 userData[currentUser].messages.push(msg);
                 localStorage.setItem('userData', JSON.stringify(userData));
@@ -966,7 +1092,9 @@
 
         function updateMessages() {
             const messageBox = document.getElementById("message-box");
-            messageBox.innerHTML = userData[currentUser].messages.map(m => `<p><b>${m.from}:</b> ${m.text} (${m.time})</p>`).join('') || "<p>No messages yet.</p>";
+            messageBox.innerHTML = userData[currentUser].messages.map(m => 
+                `<p><b>${m.title} ${m.from}:</b> ${m.text} (${m.time})</p>`
+            ).join('') || "<p>No messages yet.</p>";
         }
 
         function banUser() {
@@ -985,6 +1113,7 @@
                 alert(`${target} has been banned! Reason: ${userData[target].banReason}`);
                 playSound('click');
                 updateLeaderboard();
+                checkEmptyGroups();
             } else {
                 alert("User not found!");
             }
@@ -1047,6 +1176,8 @@
                 userData[target].gamesPlayed = 0;
                 userData[target].wins = 0;
                 userData[target].history = [];
+                userData[target].titles = ["Rookie"];
+                userData[target].activeTitle = "Rookie";
                 localStorage.setItem('userData', JSON.stringify(userData));
                 alert(`${target}'s stats have been reset!`);
                 playSound('click');
@@ -1076,6 +1207,7 @@
             alert(`Banned: ${banned.join(', ') || 'None'}`);
             playSound('click');
             updateLeaderboard();
+            checkEmptyGroups();
         }
 
         function massUnban() {
