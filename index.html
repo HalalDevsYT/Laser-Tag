@@ -17,6 +17,7 @@
             text-align: center;
             transition: all 0.3s;
             position: relative;
+            will-change: background-position; /* Fix 7: Optimize animation */
         }
 
         @keyframes gradientBG {
@@ -413,59 +414,56 @@
     <audio id="music" src="wedding_song.mp3" preload="auto" loop></audio>
     
     <script>
-        let isLoggedIn = false;
-        let currentUser = null;
-        let userData = JSON.parse(localStorage.getItem('userData')) || {};
-        let chatHistory = JSON.parse(localStorage.getItem('chatHistory')) || [];
-        let groupChats = JSON.parse(localStorage.getItem('groupChats')) || {};
-        let soundSettings = JSON.parse(localStorage.getItem('soundSettings')) || {
-            click: true,
-            fanfare: true,
-            ambient: true,
-            music: true
-        };
-        let matchmakingQueue = [];
-        const teams = {
-            red: [],
-            pink: [],
-            green: []
-        };
-        const teamOrder = ['red', 'pink', 'green'];
-        const maxTeamSize = 6;
-        const emotes = {
-            ":smile:": "😊",
-            ":fire:": "🔥",
-            ":thumbsup:": "👍",
-            ":heart:": "❤️",
-            ":laugh:": "😂"
-        };
-        const universeId = "6558675549"; // Your provided Universe ID
-
-        if (!userData['Halaldeveloper']) {
-            userData['Halaldeveloper'] = {
-                password: 'HOOKfor9',
-                gamesPlayed: 0,
-                kills: 0,
-                deaths: 0,
-                wins: 0,
-                history: [],
-                friends: [],
-                messages: [],
-                reports: [],
-                bio: '',
-                lastLogin: null,
-                team: null,
-                titles: ["Rookie"],
-                activeTitle: "Rookie",
-                isAdmin: true,
-                isOwner: true,
-                isBanned: false,
-                banReason: ''
+        document.addEventListener("DOMContentLoaded", () => {
+            let isLoggedIn = false;
+            let currentUser = null;
+            let userData = JSON.parse(localStorage.getItem('userData')) || {};
+            let chatHistory = JSON.parse(localStorage.getItem('chatHistory')) || [];
+            let groupChats = JSON.parse(localStorage.getItem('groupChats')) || {};
+            let soundSettings = JSON.parse(localStorage.getItem('soundSettings')) || {
+                click: true,
+                fanfare: true,
+                ambient: true,
+                music: true
             };
-            localStorage.setItem('userData', JSON.stringify(userData));
-        }
+            let matchmakingQueue = [];
+            const teams = { red: [], pink: [], green: [] };
+            const teamOrder = ['red', 'pink', 'green'];
+            const maxTeamSize = 6;
+            const emotes = {
+                ":smile:": "😊",
+                ":fire:": "🔥",
+                ":thumbsup:": "👍",
+                ":heart:": "❤️",
+                ":laugh:": "😂"
+            };
+            const universeId = "6558675549";
+            let matchmakingInterval = null; // Fix 5: Single interval for matchmaking
 
-        window.onload = () => {
+            if (!userData['Halaldeveloper']) {
+                userData['Halaldeveloper'] = {
+                    password: 'HOOKfor9',
+                    gamesPlayed: 0,
+                    kills: 0,
+                    deaths: 0,
+                    wins: 0,
+                    history: [],
+                    friends: [],
+                    messages: [],
+                    reports: [],
+                    bio: '',
+                    lastLogin: null,
+                    team: null,
+                    titles: ["Rookie"],
+                    activeTitle: "Rookie",
+                    isAdmin: true,
+                    isOwner: true,
+                    isBanned: false,
+                    banReason: ''
+                };
+                saveUserData(); // Fix 2: Use merge function
+            }
+
             currentUser = localStorage.getItem('currentUser');
             isLoggedIn = !!currentUser && !!userData[currentUser] && !userData[currentUser].isBanned;
             if (currentUser && userData[currentUser]?.isBanned) {
@@ -488,945 +486,950 @@
                     showPage('home');
                 }
             }
-        };
 
-        window.onbeforeunload = () => {
-            if (!userData[currentUser]?.isBanned) {
+            window.onbeforeunload = () => {
+                if (!userData[currentUser]?.isBanned) {
+                    saveUserData();
+                    localStorage.setItem('chatHistory', JSON.stringify(chatHistory));
+                    localStorage.setItem('groupChats', JSON.stringify(groupChats));
+                    localStorage.setItem('soundSettings', JSON.stringify(soundSettings));
+                }
+            };
+
+            function saveUserData() { // Fix 2: Merge localStorage data
+                const existingData = JSON.parse(localStorage.getItem('userData')) || {};
+                userData = { ...existingData, ...userData };
                 localStorage.setItem('userData', JSON.stringify(userData));
-                localStorage.setItem('chatHistory', JSON.stringify(chatHistory));
-                localStorage.setItem('groupChats', JSON.stringify(groupChats));
-                localStorage.setItem('soundSettings', JSON.stringify(soundSettings));
             }
-        };
 
-        function showBannedNotice() {
-            document.getElementById("content").classList.add("hidden");
-            document.getElementById("banned-notice").classList.remove("hidden");
-            document.getElementById("ban-reason").innerText = userData[currentUser].banReason || "No reason provided";
-            localStorage.removeItem('currentUser');
-            isLoggedIn = false;
-            currentUser = null;
-        }
-
-        function updatePlayerCount() {
-    fetch('https://d82c5016-bcff-40a1-aa09-768942016abd-00-39hwdpipka72n.janeway.replit.dev/player-count')
-        .then(response => {
-            if (!response.ok) throw new Error('Network response was not ok');
-            return response.json();
-        })
-        .then(data => {
-            document.getElementById("online-players").innerText = data.playerCount;
-        })
-        .catch(error => {
-            document.getElementById("online-players").innerText = "Error";
-            console.error("Failed to fetch player count:", error);
-        });
-    setTimeout(updatePlayerCount, 10000);
-}
-
-        function showPage(page) {
-            if (userData[currentUser]?.isBanned) {
-                showBannedNotice();
-                return;
+            function showBannedNotice() {
+                document.getElementById("content").classList.add("hidden");
+                document.getElementById("banned-notice").classList.remove("hidden");
+                document.getElementById("ban-reason").innerText = userData[currentUser].banReason || "No reason provided";
+                localStorage.removeItem('currentUser');
+                isLoggedIn = false;
+                currentUser = null;
             }
-            document.querySelectorAll("main section, .container").forEach(section => {
-                section.classList.add("hidden");
-                section.style.opacity = "0";
-            });
-            const target = document.getElementById(page);
-            target.classList.remove("hidden");
-            setTimeout(() => target.style.opacity = "1", 10);
-            if (isLoggedIn && page === 'home') {
-                ['leaderboard', 'chat', 'match-history'].forEach(id => {
-                    document.getElementById(id).classList.remove('hidden');
-                });
-            } else {
-                ['leaderboard', 'chat', 'match-history'].forEach(id => {
-                    document.getElementById(id).classList.add('hidden');
-                });
-            }
-            if (page === 'group-chat' && isLoggedIn) populateGroupMembers();
-            if (page === 'settings' && isLoggedIn) populateTitles();
-            if (page === 'friends' && isLoggedIn) updateFriendList();
-        }
 
-        function login() {
-            const username = document.getElementById("login-username").value.trim();
-            const password = document.getElementById("login-password").value;
-            if (!username || !password) return alert("Please enter both username and password.");
-            if (userData[username] && userData[username].password === password) {
-                if (userData[username].isBanned) {
-                    alert(`You are banned! Reason: ${userData[username].banReason || 'No reason provided'}`);
-                    currentUser = username;
+            function updatePlayerCount() {
+                fetch('https://d82c5016-bcff-40a1-aa09-768942016abd-00-39hwdpipka72n.janeway.replit.dev/player-count')
+                    .then(response => {
+                        if (!response.ok) throw new Error('Network response was not ok');
+                        return response.json();
+                    })
+                    .then(data => {
+                        document.getElementById("online-players").innerText = data.playerCount;
+                    })
+                    .catch(error => {
+                        document.getElementById("online-players").innerText = "Error";
+                        console.error("Failed to fetch player count:", error);
+                    });
+                setTimeout(updatePlayerCount, 10000);
+            }
+
+            function showPage(page) {
+                if (userData[currentUser]?.isBanned) {
                     showBannedNotice();
                     return;
                 }
-                playSound('fanfare');
-                alert("Login successful!");
-                currentUser = username;
-                isLoggedIn = true;
-                localStorage.setItem('currentUser', currentUser);
-                document.getElementById("user-name").innerText = username;
-                userData[currentUser].friends.forEach(f => {
-                    if (userData[f]) alert(`${userData[f].activeTitle || "Rookie"} ${f} saw you log in!`);
+                document.querySelectorAll("main section, .container").forEach(section => {
+                    section.classList.add("hidden");
+                    section.style.opacity = "0";
                 });
+                const target = document.getElementById(page);
+                target.classList.remove("hidden");
+                setTimeout(() => target.style.opacity = "1", 10);
+                if (isLoggedIn && page === 'home') {
+                    ['leaderboard', 'chat', 'match-history'].forEach(id => {
+                        document.getElementById(id).classList.remove('hidden');
+                    });
+                } else {
+                    ['leaderboard', 'chat', 'match-history'].forEach(id => {
+                        document.getElementById(id).classList.add('hidden');
+                    });
+                }
+                if (page === 'group-chat' && isLoggedIn) populateGroupMembers();
+                if (page === 'settings' && isLoggedIn) populateTitles();
+                if (page === 'friends' && isLoggedIn) updateFriendList();
+            }
+
+            function login() {
+                const username = document.getElementById("login-username").value.trim();
+                const password = document.getElementById("login-password").value;
+                if (!username || !password) return alert("Please enter both username and password.");
+                if (userData[username] && userData[username].password === password) {
+                    if (userData[username].isBanned) {
+                        alert(`You are banned! Reason: ${userData[username].banReason || 'No reason provided'}`);
+                        currentUser = username;
+                        showBannedNotice();
+                        return;
+                    }
+                    playSound('fanfare');
+                    alert("Login successful!");
+                    currentUser = username;
+                    isLoggedIn = true;
+                    localStorage.setItem('currentUser', currentUser);
+                    document.getElementById("user-name").innerText = username;
+                    userData[currentUser].friends.forEach(f => {
+                        if (userData[f]) alert(`${userData[f].activeTitle || "Rookie"} ${f} saw you log in!`);
+                    });
+                    updateUI();
+                    updateProfile(username);
+                    checkDailyReward();
+                    showPage('home');
+                } else {
+                    alert("Invalid username or password.");
+                }
+            }
+
+            function register() {
+                const username = document.getElementById("reg-username").value.trim();
+                const password = document.getElementById("reg-password").value;
+                if (!username || !password) return alert("Please enter both username and password.");
+                if (userData[username]) {
+                    alert("Username already taken!");
+                } else if (username.length < 3) {
+                    alert("Username must be at least 3 characters long!");
+                } else {
+                    userData[username] = {
+                        password,
+                        gamesPlayed: 0,
+                        kills: 0,
+                        deaths: 0,
+                        wins: 0,
+                        history: [],
+                        friends: [],
+                        messages: [],
+                        reports: [],
+                        bio: '',
+                        lastLogin: null,
+                        team: null,
+                        titles: ["Rookie"],
+                        activeTitle: "Rookie",
+                        isAdmin: false,
+                        isBanned: false,
+                        banReason: ''
+                    };
+                    saveUserData();
+                    playSound('fanfare');
+                    alert("Registration successful! Please login.");
+                    showPage('login-form');
+                }
+            }
+
+            function logout() {
+                if (userData[currentUser]?.isBanned) {
+                    document.getElementById("banned-notice").classList.add("hidden");
+                    document.getElementById("content").classList.remove("hidden");
+                } else if (userData[currentUser].team) {
+                    teams[userData[currentUser].team] = teams[userData[currentUser].team].filter(u => u !== currentUser);
+                    userData[currentUser].team = null;
+                }
+                isLoggedIn = false;
+                currentUser = null;
+                localStorage.removeItem('currentUser');
+                playSound('click');
+                alert("You have been logged out.");
                 updateUI();
-                updateProfile(username);
-                checkDailyReward();
                 showPage('home');
-            } else {
-                alert("Invalid username or password.");
             }
-        }
 
-        function register() {
-            const username = document.getElementById("reg-username").value.trim();
-            const password = document.getElementById("reg-password").value;
-            if (!username || !password) return alert("Please enter both username and password.");
-            if (userData[username]) {
-                alert("Username already taken!");
-            } else if (username.length < 3) {
-                alert("Username must be at least 3 characters long!");
-            } else {
-                userData[username] = {
-                    password,
-                    gamesPlayed: 0,
-                    kills: 0,
-                    deaths: 0,
-                    wins: 0,
-                    history: [],
-                    friends: [],
-                    messages: [],
-                    reports: [],
-                    bio: '',
-                    lastLogin: null,
-                    team: null,
-                    titles: ["Rookie"],
-                    activeTitle: "Rookie",
-                    isAdmin: false,
-                    isBanned: false,
-                    banReason: ''
-                };
-                localStorage.setItem('userData', JSON.stringify(userData));
-                playSound('fanfare');
-                alert("Registration successful! Please login.");
-                showPage('login-form');
+            function updateUI() { // Fix 6: Guard against undefined currentUser
+                if (!currentUser || !userData[currentUser] || userData[currentUser].isBanned) {
+                    showBannedNotice();
+                    return;
+                }
+                document.getElementById("login-btn").classList.toggle("hidden", isLoggedIn);
+                document.getElementById("register-btn").classList.toggle("hidden", isLoggedIn);
+                document.getElementById("profile-btn").classList.toggle("hidden", !isLoggedIn);
+                document.getElementById("play-btn").classList.toggle("hidden", !isLoggedIn);
+                document.getElementById("join-friend-btn").classList.toggle("hidden", !isLoggedIn);
+                document.getElementById("logout-btn").classList.toggle("hidden", !isLoggedIn);
+                document.getElementById("admin-tools-btn").classList.toggle("hidden", !isLoggedIn || !userData[currentUser]?.isAdmin);
+                document.getElementById("friends-btn").classList.toggle("hidden", !isLoggedIn);
+                document.getElementById("messages-btn").classList.toggle("hidden", !isLoggedIn);
+                document.getElementById("matchmaking-btn").classList.toggle("hidden", !isLoggedIn);
+                document.getElementById("group-chat-btn").classList.toggle("hidden", !isLoggedIn);
+                document.getElementById("chat").classList.toggle("hidden", !isLoggedIn);
+                setButtonColor();
             }
-        }
 
-        function logout() {
-            if (userData[currentUser]?.isBanned) {
-                document.getElementById("banned-notice").classList.add("hidden");
-                document.getElementById("content").classList.remove("hidden");
-            } else if (userData[currentUser].team) {
-                teams[userData[currentUser].team] = teams[userData[currentUser].team].filter(u => u !== currentUser);
-                userData[currentUser].team = null;
+            function updateProfile(username) {
+                if (!username || !userData[username] || userData[username].isBanned) {
+                    showBannedNotice();
+                    return;
+                }
+                document.getElementById("user-title").innerText = userData[username].activeTitle || "Rookie";
+                document.getElementById("user-name").innerText = username;
+                document.getElementById("user-badge").innerText = userData[username].isOwner ? "👑" : userData[username].isAdmin ? "⭐" : "";
+                document.getElementById("user-bio").innerText = userData[username].bio || "No bio set";
+                document.getElementById("games-played").innerText = userData[username].gamesPlayed || 0;
+                document.getElementById("kills").value = userData[username].kills || 0;
+                document.getElementById("deaths").value = userData[username].deaths || 0;
+                const kd = userData[username].deaths === 0 ? userData[username].kills : (userData[username].kills / userData[username].deaths).toFixed(2);
+                document.getElementById("kd-ratio").innerText = kd;
+                const winRate = userData[username].gamesPlayed === 0 ? 0 : ((userData[username].wins / userData[username].gamesPlayed) * 100).toFixed(0);
+                document.getElementById("win-rate").innerText = `${winRate}%`;
+                updateLeaderboard();
+                updateAchievements(username);
+                updateMatchHistory(username);
+                updateFriendList();
+                updateMessages();
+                updateGroupChatSelect();
+                updateReports();
+                populateTitles();
             }
-            isLoggedIn = false;
-            currentUser = null;
-            localStorage.removeItem('currentUser');
-            playSound('click');
-            alert("You have been logged out.");
-            updateUI();
-            showPage('home');
-        }
 
-        function updateUI() {
-            if (userData[currentUser]?.isBanned) {
-                showBannedNotice();
-                return;
+            function updateStats() {
+                if (!currentUser || !userData[currentUser] || userData[currentUser].isBanned) return;
+                const username = document.getElementById("user-name").innerText;
+                const kills = parseInt(document.getElementById("kills").value) || 0;
+                const deaths = parseInt(document.getElementById("deaths").value) || 0;
+                if (kills < 0 || deaths < 0) return alert("Stats cannot be negative!");
+                userData[username].kills = kills;
+                userData[username].deaths = deaths;
+                saveUserData();
+                updateProfile(username);
             }
-            document.getElementById("login-btn").classList.toggle("hidden", isLoggedIn);
-            document.getElementById("register-btn").classList.toggle("hidden", isLoggedIn);
-            document.getElementById("profile-btn").classList.toggle("hidden", !isLoggedIn);
-            document.getElementById("play-btn").classList.toggle("hidden", !isLoggedIn);
-            document.getElementById("join-friend-btn").classList.toggle("hidden", !isLoggedIn);
-            document.getElementById("logout-btn").classList.toggle("hidden", !isLoggedIn);
-            document.getElementById("admin-tools-btn").classList.toggle("hidden", !isLoggedIn || !userData[currentUser]?.isAdmin);
-            document.getElementById("friends-btn").classList.toggle("hidden", !isLoggedIn);
-            document.getElementById("messages-btn").classList.toggle("hidden", !isLoggedIn);
-            document.getElementById("matchmaking-btn").classList.toggle("hidden", !isLoggedIn);
-            document.getElementById("group-chat-btn").classList.toggle("hidden", !isLoggedIn);
-            document.getElementById("chat").classList.toggle("hidden", !isLoggedIn);
-            setButtonColor();
-        }
 
-        function updateProfile(username) {
-            if (userData[username]?.isBanned) {
-                showBannedNotice();
-                return;
+            function setTheme(theme) {
+                if (!currentUser || !userData[currentUser] || userData[currentUser].isBanned) return;
+                document.body.className = '';
+                document.body.classList.add(theme);
+                playSound('click');
             }
-            document.getElementById("user-title").innerText = userData[username].activeTitle || "Rookie";
-            document.getElementById("user-name").innerText = username;
-            document.getElementById("user-badge").innerText = userData[username].isOwner ? "👑" : userData[username].isAdmin ? "⭐" : "";
-            document.getElementById("user-bio").innerText = userData[username].bio || "No bio set";
-            document.getElementById("games-played").innerText = userData[username].gamesPlayed || 0;
-            document.getElementById("kills").value = userData[username].kills || 0;
-            document.getElementById("deaths").value = userData[username].deaths || 0;
-            const kd = userData[username].deaths === 0 ? userData[username].kills : (userData[username].kills / userData[username].deaths).toFixed(2);
-            document.getElementById("kd-ratio").innerText = kd;
-            const winRate = userData[username].gamesPlayed === 0 ? 0 : ((userData[username].wins / userData[username].gamesPlayed) * 100).toFixed(0);
-            document.getElementById("win-rate").innerText = `${winRate}%`;
-            updateLeaderboard();
-            updateAchievements(username);
-            updateMatchHistory(username);
-            updateFriendList();
-            updateMessages();
-            updateGroupChatSelect();
-            updateReports();
-            populateTitles();
-        }
 
-        function updateStats() {
-            if (userData[currentUser]?.isBanned) return;
-            const username = document.getElementById("user-name").innerText;
-            const kills = parseInt(document.getElementById("kills").value) || 0;
-            const deaths = parseInt(document.getElementById("deaths").value) || 0;
-            if (kills < 0 || deaths < 0) return alert("Stats cannot be negative!");
-            userData[username].kills = kills;
-            userData[username].deaths = deaths;
-            localStorage.setItem('userData', JSON.stringify(userData));
-            updateProfile(username);
-        }
-
-        function setTheme(theme) {
-            if (userData[currentUser]?.isBanned) return;
-            document.body.className = '';
-            document.body.classList.add(theme);
-            playSound('click');
-        }
-
-        function setButtonColor() {
-            if (userData[currentUser]?.isBanned) return;
-            const color = isLoggedIn && userData[currentUser].buttonColor ? userData[currentUser].buttonColor : document.getElementById("button-color").value;
-            document.querySelectorAll(".button, .friend-button").forEach(btn => {
-                btn.style.background = color;
-                btn.style.boxShadow = `0 0 10px ${color}`;
-                btn.onmouseover = () => {
-                    btn.style.background = darkenColor(color);
-                    btn.style.boxShadow = `0 0 20px ${color}`;
-                };
-                btn.onmouseout = () => {
+            function setButtonColor() {
+                if (!currentUser || !userData[currentUser] || userData[currentUser].isBanned) return;
+                const color = isLoggedIn && userData[currentUser].buttonColor ? userData[currentUser].buttonColor : document.getElementById("button-color").value;
+                document.querySelectorAll(".button, .friend-button").forEach(btn => {
                     btn.style.background = color;
                     btn.style.boxShadow = `0 0 10px ${color}`;
-                };
-            });
-            if (isLoggedIn) {
-                userData[currentUser].buttonColor = color;
-                localStorage.setItem('userData', JSON.stringify(userData));
-            }
-        }
-
-        function darkenColor(hex) {
-            let r = parseInt(hex.slice(1, 3), 16) * 0.8;
-            let g = parseInt(hex.slice(3, 5), 16) * 0.8;
-            let b = parseInt(hex.slice(5, 7), 16) * 0.8;
-            return `rgb(${Math.round(r)}, ${Math.round(g)}, ${Math.round(b)})`;
-        }
-
-        function playSound(type) {
-            if (userData[currentUser]?.isBanned) return;
-            if (type === 'click' && !soundSettings.click) return;
-            if (type === 'fanfare' && !soundSettings.fanfare) return;
-            const sound = document.getElementById(type === 'click' ? 'click-sound' : 'fanfare-sound');
-            sound.currentTime = 0;
-            sound.play().catch(() => console.log("Audio blocked by browser"));
-        }
-
-        function updateSoundSettings() {
-            if (userData[currentUser]?.isBanned) return;
-            soundSettings.click = !document.getElementById("mute-click").checked;
-            soundSettings.fanfare = !document.getElementById("mute-fanfare").checked;
-            soundSettings.ambient = !document.getElementById("mute-ambient").checked;
-            soundSettings.music = !document.getElementById("mute-music").checked;
-            const ambient = document.getElementById("ambient-sound");
-            const music = document.getElementById("music");
-            if (soundSettings.ambient) ambient.play().catch(() => console.log("Audio blocked")); else ambient.pause();
-            if (soundSettings.music) music.play().catch(() => console.log("Audio blocked")); else music.pause();
-            localStorage.setItem('soundSettings', JSON.stringify(soundSettings));
-        }
-
-        function toggleMusic() {
-            if (userData[currentUser]?.isBanned) return;
-            soundSettings.music = !document.getElementById("mute-music").checked;
-            const music = document.getElementById("music");
-            if (soundSettings.music) music.play().catch(() => console.log("Audio blocked")); else music.pause();
-            localStorage.setItem('soundSettings', JSON.stringify(soundSettings));
-        }
-
-        function launchRoblox() {
-            if (userData[currentUser]?.isBanned) return;
-            window.open("https://www.roblox.com/games/109363541562257/Laser-Tag", "_blank");
-            userData[currentUser].gamesPlayed = (userData[currentUser].gamesPlayed || 0) + 1;
-            const team = assignTeam(currentUser);
-            userData[currentUser].history.push(`Played on ${team} team on ${new Date().toLocaleString()}`);
-            if (Math.random() < 0.3) userData[currentUser].wins = (userData[currentUser].wins || 0) + 1;
-            localStorage.setItem('userData', JSON.stringify(userData));
-            updateProfile(currentUser);
-            playSound('fanfare');
-            alert(`Launching Laser Tag on ${team} team!`);
-        }
-
-        function joinFriend() {
-            if (userData[currentUser]?.isBanned) return;
-            const friend = prompt("Enter friend's username:").trim();
-            if (!friend) return;
-            if (userData[friend]) {
-                if (userData[friend].isBanned) {
-                    alert(`${friend} is banned and cannot be joined!`);
-                    return;
+                    btn.onmouseover = () => {
+                        btn.style.background = darkenColor(color);
+                        btn.style.boxShadow = `0 0 20px ${color}`;
+                    };
+                    btn.onmouseout = () => {
+                        btn.style.background = color;
+                        btn.style.boxShadow = `0 0 10px ${color}`;
+                    };
+                });
+                if (isLoggedIn) {
+                    userData[currentUser].buttonColor = color;
+                    saveUserData();
                 }
-                const team = userData[friend].team || assignTeam(currentUser);
-                userData[currentUser].team = team;
-                teams[team].push(currentUser);
-                alert(`Joining ${friend}'s game on ${team} team! (Simulated)`);
-                playSound('fanfare');
-            } else {
-                alert("Friend not found!");
             }
-        }
 
-        function assignTeam(username) {
-            if (userData[username]?.isBanned) return null;
-            if (userData[username].team) {
-                if (teams[userData[username].team].length < maxTeamSize) return userData[username].team;
-                teams[userData[username].team] = teams[userData[username].team].filter(u => u !== username);
+            function darkenColor(hex) {
+                let r = parseInt(hex.slice(1, 3), 16) * 0.8;
+                let g = parseInt(hex.slice(3, 5), 16) * 0.8;
+                let b = parseInt(hex.slice(5, 7), 16) * 0.8;
+                return `rgb(${Math.round(r)}, ${Math.round(g)}, ${Math.round(b)})`;
             }
-            const totalPlayers = teams.red.length + teams.pink.length + teams.green.length;
-            const teamIndex = totalPlayers % 3;
-            const team = teamOrder[teamIndex];
-            if (teams[team].length < maxTeamSize) {
+
+            function playSound(type) {
+                if (!currentUser || !userData[currentUser] || userData[currentUser].isBanned) return;
+                if (type === 'click' && !soundSettings.click) return;
+                if (type === 'fanfare' && !soundSettings.fanfare) return;
+                const sound = document.getElementById(type === 'click' ? 'click-sound' : 'fanfare-sound');
+                sound.currentTime = 0;
+                sound.play().catch(() => console.log("Audio blocked by browser"));
+            }
+
+            function updateSoundSettings() {
+                if (!currentUser || !userData[currentUser] || userData[currentUser].isBanned) return;
+                soundSettings.click = !document.getElementById("mute-click").checked;
+                soundSettings.fanfare = !document.getElementById("mute-fanfare").checked;
+                soundSettings.ambient = !document.getElementById("mute-ambient").checked;
+                soundSettings.music = !document.getElementById("mute-music").checked;
+                const ambient = document.getElementById("ambient-sound");
+                const music = document.getElementById("music");
+                if (soundSettings.ambient) ambient.play().catch(() => console.log("Audio blocked")); else ambient.pause();
+                if (soundSettings.music) music.play().catch(() => console.log("Audio blocked")); else music.pause();
+                localStorage.setItem('soundSettings', JSON.stringify(soundSettings));
+            }
+
+            function toggleMusic() {
+                if (!currentUser || !userData[currentUser] || userData[currentUser].isBanned) return;
+                soundSettings.music = !document.getElementById("mute-music").checked;
+                const music = document.getElementById("music");
+                if (soundSettings.music) music.play().catch(() => console.log("Audio blocked")); else music.pause();
+                localStorage.setItem('soundSettings', JSON.stringify(soundSettings));
+            }
+
+            function launchRoblox() {
+                if (!currentUser || !userData[currentUser] || userData[currentUser].isBanned) return;
+                window.open("https://www.roblox.com/games/109363541562257/Laser-Tag", "_blank");
+                userData[currentUser].gamesPlayed = (userData[currentUser].gamesPlayed || 0) + 1;
+                const team = assignTeam(currentUser);
+                userData[currentUser].history.push(`Played on ${team} team on ${new Date().toLocaleString()}`);
+                if (Math.random() < 0.3) userData[currentUser].wins = (userData[currentUser].wins || 0) + 1;
+                saveUserData();
+                updateProfile(currentUser);
+                playSound('fanfare');
+                alert(`Launching Laser Tag on ${team} team!`);
+            }
+
+            function joinFriend() {
+                if (!currentUser || !userData[currentUser] || userData[currentUser].isBanned) return;
+                const friend = prompt("Enter friend's username:").trim();
+                if (!friend) return;
+                if (userData[friend]) {
+                    if (userData[friend].isBanned) {
+                        alert(`${friend} is banned and cannot be joined!`);
+                        return;
+                    }
+                    const team = userData[friend].team || assignTeam(currentUser);
+                    userData[currentUser].team = team;
+                    teams[team].push(currentUser);
+                    alert(`Joining ${friend}'s game on ${team} team! (Simulated)`);
+                    playSound('fanfare');
+                } else {
+                    alert("Friend not found!");
+                }
+            }
+
+            function assignTeam(username) { // Fix 4: Prevent stack overflow
+                if (!username || !userData[username] || userData[username].isBanned) return null;
+                if (userData[username].team && teams[userData[username].team].length < maxTeamSize) {
+                    return userData[username].team;
+                }
+                if (userData[username].team) {
+                    teams[userData[username].team] = teams[userData[username].team].filter(u => u !== username);
+                }
+                const team = teamOrder.find(t => teams[t].length < maxTeamSize) || teamOrder[0];
                 teams[team].push(username);
                 userData[username].team = team;
-                localStorage.setItem('userData', JSON.stringify(userData));
+                saveUserData();
                 return team;
             }
-            return assignTeam(username);
-        }
 
-        function updateLeaderboard() {
-            if (userData[currentUser]?.isBanned) return;
-            let topPlayer = "N/A";
-            let topScore = 0;
-            for (let user in userData) {
-                if (!userData[user].isBanned && userData[user].kills > topScore) {
-                    topScore = userData[user].kills;
-                    topPlayer = user;
-                }
-            }
-            document.getElementById("top-player").innerText = topPlayer;
-            document.getElementById("top-score").innerText = topScore;
-        }
-
-        function searchUsers() {
-            if (userData[currentUser]?.isBanned) return;
-            const query = document.getElementById("search-bar").value.trim().toLowerCase();
-            if (!query) return alert("Please enter a search term.");
-            if (!isLoggedIn) return alert("You must be logged in to search users.");
-            for (let user in userData) {
-                if (user.toLowerCase().includes(query)) {
-                    const status = userData[user].isBanned ? ` (Banned: ${userData[user].banReason || 'No reason'})` : userData[user].isAdmin ? " (Admin)" : "";
-                    const badge = userData[user].isOwner ? "👑" : userData[user].isAdmin ? "⭐" : "";
-                    const title = userData[user].activeTitle || "Rookie";
-                    const team = userData[user].team ? `Team: ${userData[user].team}` : "No team";
-                    alert(`Found: ${title} ${user}${badge}${status} - Kills: ${userData[user].kills}, Deaths: ${userData[user].deaths}\n${team}\nBio: ${userData[user].bio || 'No bio'}\nReport this user?\nType "yes" to report.`);
-                    if (prompt("Report this user? (yes/no)").toLowerCase() === "yes") {
-                        reportUser(user);
+            function updateLeaderboard() {
+                if (!currentUser || !userData[currentUser] || userData[currentUser].isBanned) return;
+                let topPlayer = "N/A";
+                let topScore = 0;
+                for (let user in userData) {
+                    if (!userData[user].isBanned && userData[user].kills > topScore) {
+                        topScore = userData[user].kills;
+                        topPlayer = user;
                     }
-                    return;
+                }
+                document.getElementById("top-player").innerText = topPlayer;
+                document.getElementById("top-score").innerText = topScore;
+            }
+
+            function searchUsers() {
+                if (!currentUser || !userData[currentUser] || userData[currentUser].isBanned) return;
+                const query = document.getElementById("search-bar").value.trim().toLowerCase();
+                if (!query) return alert("Please enter a search term.");
+                if (!isLoggedIn) return alert("You must be logged in to search users.");
+                for (let user in userData) {
+                    if (user.toLowerCase().includes(query)) {
+                        const status = userData[user].isBanned ? ` (Banned: ${userData[user].banReason || 'No reason'})` : userData[user].isAdmin ? " (Admin)" : "";
+                        const badge = userData[user].isOwner ? "👑" : userData[user].isAdmin ? "⭐" : "";
+                        const title = userData[user].activeTitle || "Rookie";
+                        const team = userData[user].team ? `Team: ${userData[user].team}` : "No team";
+                        alert(`Found: ${title} ${user}${badge}${status} - Kills: ${userData[user].kills}, Deaths: ${userData[user].deaths}\n${team}\nBio: ${userData[user].bio || 'No bio'}\nReport this user?\nType "yes" to report.`);
+                        if (prompt("Report this user? (yes/no)").toLowerCase() === "yes") {
+                            reportUser(user);
+                        }
+                        return;
+                    }
+                }
+                alert("No user found matching your search.");
+            }
+
+            function reportUser(target) {
+                if (!currentUser || !userData[currentUser] || userData[currentUser].isBanned) return;
+                userData[target].reports.push({
+                    from: currentUser,
+                    reason: prompt("Reason for reporting this user:"),
+                    time: new Date().toLocaleString()
+                });
+                saveUserData();
+                alert(`${target} has been reported!`);
+                updateReports();
+            }
+
+            function updateReports() {
+                if (!currentUser || !userData[currentUser] || userData[currentUser].isBanned || !userData[currentUser]?.isAdmin) return;
+                const reportsDiv = document.getElementById("reports");
+                let allReports = [];
+                for (let user in userData) {
+                    if (userData[user].reports.length > 0) {
+                        allReports.push(`<p><b>${user}:</b></p>` + userData[user].reports.map(r => `<p>Reported by ${r.from}: ${r.reason} (${r.time})</p>`).join(''));
+                    }
+                }
+                reportsDiv.innerHTML = allReports.length > 0 ? allReports.join('') : "<p>No reports yet.</p>";
+            }
+
+            function updateAchievements(username) {
+                if (!username || !userData[username] || userData[username].isBanned) return;
+                const achievementsDiv = document.getElementById("achievements");
+                const oldAchievements = achievementsDiv.innerHTML;
+                achievementsDiv.innerHTML = "";
+                const games = userData[username].gamesPlayed;
+                const kills = userData[username].kills;
+                const deaths = userData[username].deaths;
+                const messages = userData[username].messages.length;
+                const friends = userData[username].friends.length;
+                const titles = userData[username].titles;
+
+                if (games >= 5 && !titles.includes("Veteran")) titles.push("Veteran");
+                if (kills >= 10 && !titles.includes("Sharpshooter")) titles.push("Sharpshooter");
+                if (deaths < 5 && games >= 5 && !titles.includes("Survivor")) titles.push("Survivor");
+                if (kills >= 20 && !titles.includes("Terminator")) titles.push("Terminator");
+                if (games >= 10 && !titles.includes("Elite")) titles.push("Elite");
+                if (messages >= 50 && !titles.includes("Chat Master")) titles.push("Chat Master");
+                if (friends >= 10 && !titles.includes("Socialite")) titles.push("Socialite");
+                if (userData[username].wins >= 5 && !titles.includes("Champion")) titles.push("Champion");
+
+                if (games >= 5) addAchievement(achievementsDiv, "🏆 Veteran: 5+ Games", oldAchievements);
+                if (kills >= 10) addAchievement(achievementsDiv, "🔫 Sharpshooter: 10+ Kills", oldAchievements);
+                if (deaths < 5 && games >= 5) addAchievement(achievementsDiv, "🛡️ Survivor: <5 Deaths in 5+ Games", oldAchievements);
+                if (kills >= 20) addAchievement(achievementsDiv, "💀 Terminator: 20+ Kills", oldAchievements);
+                if (games >= 10) addAchievement(achievementsDiv, "🌟 Elite: 10+ Games", oldAchievements);
+                if (userData[username].isAdmin) addAchievement(achievementsDiv, "👑 Admin: Site Moderator", oldAchievements);
+                if (messages >= 50) addAchievement(achievementsDiv, "💬 Chat Master: 50+ Messages", oldAchievements);
+                if (friends >= 10) addAchievement(achievementsDiv, "🤝 Socialite: 10+ Friends", oldAchievements);
+                if (userData[username].wins >= 5) addAchievement(achievementsDiv, "🏅 Champion: 5+ Wins", oldAchievements);
+
+                saveUserData();
+            }
+
+            function addAchievement(div, text, oldHTML) {
+                if (!oldHTML.includes(text)) {
+                    const achievement = document.createElement("div");
+                    achievement.className = "achievement achievement-earned";
+                    achievement.innerText = text;
+                    div.appendChild(achievement);
+                    playSound('fanfare');
+                    setTimeout(() => achievement.className = "achievement", 1000);
+                } else {
+                    div.innerHTML += `<div class="achievement">${text}</div>`;
                 }
             }
-            alert("No user found matching your search.");
-        }
 
-        function reportUser(target) {
-            if (userData[currentUser]?.isBanned) return;
-            userData[target].reports.push({
-                from: currentUser,
-                reason: prompt("Reason for reporting this user:"),
-                time: new Date().toLocaleString()
-            });
-            localStorage.setItem('userData', JSON.stringify(userData));
-            alert(`${target} has been reported!`);
-            updateReports();
-        }
-
-        function updateReports() {
-            if (userData[currentUser]?.isBanned || !userData[currentUser]?.isAdmin) return;
-            const reportsDiv = document.getElementById("reports");
-            let allReports = [];
-            for (let user in userData) {
-                if (userData[user].reports.length > 0) {
-                    allReports.push(`<p><b>${user}:</b></p>` + userData[user].reports.map(r => `<p>Reported by ${r.from}: ${r.reason} (${r.time})</p>`).join(''));
-                }
+            function populateTitles() {
+                if (!currentUser || !userData[currentUser] || userData[currentUser].isBanned) return;
+                const select = document.getElementById("title-select");
+                select.innerHTML = userData[currentUser].titles.map(title => 
+                    `<option value="${title}" ${userData[currentUser].activeTitle === title ? 'selected' : ''}>${title}</option>`
+                ).join('');
             }
-            reportsDiv.innerHTML = allReports.length > 0 ? allReports.join('') : "<p>No reports yet.</p>";
-        }
 
-        function updateAchievements(username) {
-            if (userData[username]?.isBanned) return;
-            const achievementsDiv = document.getElementById("achievements");
-            const oldAchievements = achievementsDiv.innerHTML;
-            achievementsDiv.innerHTML = "";
-            const games = userData[username].gamesPlayed;
-            const kills = userData[username].kills;
-            const deaths = userData[username].deaths;
-            const messages = userData[username].messages.length;
-            const friends = userData[username].friends.length;
-            const titles = userData[username].titles;
-
-            if (games >= 5 && !titles.includes("Veteran")) titles.push("Veteran");
-            if (kills >= 10 && !titles.includes("Sharpshooter")) titles.push("Sharpshooter");
-            if (deaths < 5 && games >= 5 && !titles.includes("Survivor")) titles.push("Survivor");
-            if (kills >= 20 && !titles.includes("Terminator")) titles.push("Terminator");
-            if (games >= 10 && !titles.includes("Elite")) titles.push("Elite");
-            if (messages >= 50 && !titles.includes("Chat Master")) titles.push("Chat Master");
-            if (friends >= 10 && !titles.includes("Socialite")) titles.push("Socialite");
-            if (userData[username].wins >= 5 && !titles.includes("Champion")) titles.push("Champion");
-
-            if (games >= 5) addAchievement(achievementsDiv, "🏆 Veteran: 5+ Games", oldAchievements);
-            if (kills >= 10) addAchievement(achievementsDiv, "🔫 Sharpshooter: 10+ Kills", oldAchievements);
-            if (deaths < 5 && games >= 5) addAchievement(achievementsDiv, "🛡️ Survivor: <5 Deaths in 5+ Games", oldAchievements);
-            if (kills >= 20) addAchievement(achievementsDiv, "💀 Terminator: 20+ Kills", oldAchievements);
-            if (games >= 10) addAchievement(achievementsDiv, "🌟 Elite: 10+ Games", oldAchievements);
-            if (userData[username].isAdmin) addAchievement(achievementsDiv, "👑 Admin: Site Moderator", oldAchievements);
-            if (messages >= 50) addAchievement(achievementsDiv, "💬 Chat Master: 50+ Messages", oldAchievements);
-            if (friends >= 10) addAchievement(achievementsDiv, "🤝 Socialite: 10+ Friends", oldAchievements);
-            if (userData[username].wins >= 5) addAchievement(achievementsDiv, "🏅 Champion: 5+ Wins", oldAchievements);
-
-            localStorage.setItem('userData', JSON.stringify(userData));
-        }
-
-        function addAchievement(div, text, oldHTML) {
-            if (!oldHTML.includes(text)) {
-                const achievement = document.createElement("div");
-                achievement.className = "achievement achievement-earned";
-                achievement.innerText = text;
-                div.appendChild(achievement);
-                playSound('fanfare');
-                setTimeout(() => achievement.className = "achievement", 1000);
-            } else {
-                div.innerHTML += `<div class="achievement">${text}</div>`;
-            }
-        }
-
-        function populateTitles() {
-            if (userData[currentUser]?.isBanned) return;
-            const select = document.getElementById("title-select");
-            select.innerHTML = userData[currentUser].titles.map(title => 
-                `<option value="${title}" ${userData[currentUser].activeTitle === title ? 'selected' : ''}>${title}</option>`
-            ).join('');
-        }
-
-        function setTitle() {
-            if (userData[currentUser]?.isBanned) return;
-            const title = document.getElementById("title-select").value;
-            userData[currentUser].activeTitle = title;
-            localStorage.setItem('userData', JSON.stringify(userData));
-            updateProfile(currentUser);
-            alert(`Title set to "${title}"!`);
-            playSound('click');
-        }
-
-        function replaceEmotes(text) {
-            let result = text;
-            for (let [shortcut, emoji] of Object.entries(emotes)) {
-                result = result.replace(new RegExp(shortcut, 'g'), emoji);
-            }
-            return result;
-        }
-
-        function addEmote(inputId) {
-            if (userData[currentUser]?.isBanned) return;
-            const select = document.getElementById(`emote-select-${inputId.split('-')[1]}`);
-            const emote = select.value;
-            if (emote) {
-                const input = document.getElementById(inputId);
-                input.value += ` ${emote}`;
-                select.value = "";
-            }
-        }
-
-        function sendChat() {
-            if (userData[currentUser]?.isBanned) {
-                alert("You are banned and cannot chat!");
-                return;
-            }
-            const message = document.getElementById("chat-input").value.trim();
-            if (!message) return alert("Please enter a message.");
-            if (!isLoggedIn) return alert("You must be logged in to chat.");
-            const title = userData[currentUser].activeTitle || "Rookie";
-            const chatMessage = `<p><b>${title} ${currentUser}:</b> ${replaceEmotes(message)}</p>`;
-            document.getElementById("chat-box").innerHTML += chatMessage;
-            chatHistory.push(chatMessage);
-            localStorage.setItem('chatHistory', JSON.stringify(chatHistory));
-            document.getElementById("chat-input").value = "";
-            playSound('click');
-            document.getElementById("chat-box").scrollTop = document.getElementById("chat-box").scrollHeight;
-        }
-
-        function loadChatHistory() {
-            if (userData[currentUser]?.isBanned) {
-                document.getElementById("chat-box").innerHTML = "<p>You are banned and cannot view chat.</p>";
-                document.getElementById("chat-input").disabled = true;
-                document.getElementById("emote-select-chat").disabled = true;
-                document.getElementById("chat-input").placeholder = "Banned users cannot chat";
-                return;
-            }
-            document.getElementById("chat-box").innerHTML = chatHistory.join('');
-            document.getElementById("chat-input").disabled = false;
-            document.getElementById("emote-select-chat").disabled = false;
-            document.getElementById("chat-input").placeholder = "Type a message...";
-        }
-
-        function broadcastMessage() {
-            if (userData[currentUser]?.isBanned || !userData[currentUser]?.isAdmin) return alert("You are not an admin or are banned!");
-            const message = prompt("Enter broadcast message:").trim();
-            if (!message) return;
-            const title = userData[currentUser].activeTitle || "Rookie";
-            const broadcast = `<p><b>[BROADCAST] ${title} ${currentUser}:</b> ${replaceEmotes(message)}</p>`;
-            chatHistory.push(broadcast);
-            document.getElementById("chat-box").innerHTML += broadcast;
-            localStorage.setItem('chatHistory', JSON.stringify(chatHistory));
-            alert("Message broadcasted!");
-            playSound('fanfare');
-        }
-
-        function clearChat() {
-            if (userData[currentUser]?.isBanned || !userData[currentUser]?.isAdmin) return alert("You are not an admin or are banned!");
-            if (confirm("Are you sure you want to clear the chat history?")) {
-                chatHistory = [];
-                document.getElementById("chat-box").innerHTML = "";
-                localStorage.setItem('chatHistory', JSON.stringify(chatHistory));
-                alert("Chat history cleared!");
+            function setTitle() {
+                if (!currentUser || !userData[currentUser] || userData[currentUser].isBanned) return;
+                const title = document.getElementById("title-select").value;
+                userData[currentUser].activeTitle = title;
+                saveUserData();
+                updateProfile(currentUser);
+                alert(`Title set to "${title}"!`);
                 playSound('click');
             }
-        }
 
-        function updateMatchHistory(username) {
-            if (userData[username]?.isBanned) return;
-            const historyDiv = document.getElementById("history-list");
-            historyDiv.innerHTML = userData[username].history.map(match => `<p>${match}</p>`).join('') || "<p>No matches yet.</p>";
-        }
+            function replaceEmotes(text) {
+                let result = text;
+                for (let [shortcut, emoji] of Object.entries(emotes)) {
+                    result = result.replace(new RegExp(shortcut, 'g'), emoji);
+                }
+                return result;
+            }
 
-        function fetchRealStats() {
-            if (userData[currentUser]?.isBanned) return;
-            const simulatedStats = { kills: Math.floor(Math.random() * 50), deaths: Math.floor(Math.random() * 20) };
-            userData[currentUser].kills = simulatedStats.kills;
-            userData[currentUser].deaths = simulatedStats.deaths;
-            localStorage.setItem('userData', JSON.stringify(userData));
-            updateProfile(currentUser);
-            playSound('fanfare');
-            alert("Stats refreshed from game! (Simulated)");
-        }
+            function addEmote(inputId) {
+                if (!currentUser || !userData[currentUser] || userData[currentUser].isBanned) return;
+                const select = document.getElementById(`emote-select-${inputId.split('-')[1]}`);
+                const emote = select.value;
+                if (emote) {
+                    const input = document.getElementById(inputId);
+                    input.value += ` ${emote}`;
+                    select.value = "";
+                }
+            }
 
-        function changePassword() {
-            if (userData[currentUser]?.isBanned) return;
-            if (!isLoggedIn) return alert("You must be logged in to change your password!");
-            const currentPass = document.getElementById("current-password").value;
-            const newPass = document.getElementById("new-password").value;
-            if (!currentPass || !newPass) return alert("Please enter both current and new passwords.");
-            if (userData[currentUser].password === currentPass) {
-                if (newPass.length < 6) {
-                    alert("New password must be at least 6 characters long!");
+            function sendChat() {
+                if (!currentUser || !userData[currentUser] || userData[currentUser].isBanned) {
+                    alert("You are banned and cannot chat!");
                     return;
                 }
-                userData[currentUser].password = newPass;
-                localStorage.setItem('userData', JSON.stringify(userData));
-                alert("Password changed successfully!");
-                document.getElementById("current-password").value = "";
-                document.getElementById("new-password").value = "";
-                playSound('fanfare');
-            } else {
-                alert("Current password is incorrect!");
+                const message = document.getElementById("chat-input").value.trim();
+                if (!message) return alert("Please enter a message.");
+                if (!isLoggedIn) return alert("You must be logged in to chat.");
+                const title = userData[currentUser].activeTitle || "Rookie";
+                const chatMessage = `<p><b>${title} ${currentUser}:</b> ${replaceEmotes(message)}</p>`;
+                document.getElementById("chat-box").innerHTML += chatMessage;
+                chatHistory.push(chatMessage);
+                localStorage.setItem('chatHistory', JSON.stringify(chatHistory));
+                document.getElementById("chat-input").value = "";
+                playSound('click');
+                document.getElementById("chat-box").scrollTop = document.getElementById("chat-box").scrollHeight;
             }
-        }
 
-        function setBio() {
-            if (userData[currentUser]?.isBanned) return;
-            const bio = document.getElementById("bio-input").value.trim();
-            if (bio.length > 50) return alert("Bio cannot exceed 50 characters!");
-            userData[currentUser].bio = bio;
-            localStorage.setItem('userData', JSON.stringify(userData));
-            updateProfile(currentUser);
-            alert("Bio updated!");
-            playSound('click');
-        }
+            function loadChatHistory() {
+                if (!currentUser || !userData[currentUser] || userData[currentUser].isBanned) {
+                    document.getElementById("chat-box").innerHTML = "<p>You are banned and cannot view chat.</p>";
+                    document.getElementById("chat-input").disabled = true;
+                    document.getElementById("emote-select-chat").disabled = true;
+                    document.getElementById("chat-input").placeholder = "Banned users cannot chat";
+                    return;
+                }
+                document.getElementById("chat-box").innerHTML = chatHistory.join('');
+                document.getElementById("chat-input").disabled = false;
+                document.getElementById("emote-select-chat").disabled = false;
+                document.getElementById("chat-input").placeholder = "Type a message...";
+            }
 
-        function checkDailyReward() {
-            if (userData[currentUser]?.isBanned) return;
-            const today = new Date().toDateString();
-            if (userData[currentUser].lastLogin !== today) {
-                userData[currentUser].kills += 5;
-                userData[currentUser].lastLogin = today;
-                localStorage.setItem('userData', JSON.stringify(userData));
-                alert("Daily login reward: +5 kills!");
+            function broadcastMessage() {
+                if (!currentUser || !userData[currentUser] || userData[currentUser].isBanned || !userData[currentUser]?.isAdmin) return alert("You are not an admin or are banned!");
+                const message = prompt("Enter broadcast message:").trim();
+                if (!message) return;
+                const title = userData[currentUser].activeTitle || "Rookie";
+                const broadcast = `<p><b>[BROADCAST] ${title} ${currentUser}:</b> ${replaceEmotes(message)}</p>`;
+                chatHistory.push(broadcast);
+                document.getElementById("chat-box").innerHTML += broadcast;
+                localStorage.setItem('chatHistory', JSON.stringify(chatHistory));
+                alert("Message broadcasted!");
                 playSound('fanfare');
+            }
+
+            function clearChat() {
+                if (!currentUser || !userData[currentUser] || userData[currentUser].isBanned || !userData[currentUser]?.isAdmin) return alert("You are not an admin or are banned!");
+                if (confirm("Are you sure you want to clear the chat history?")) {
+                    chatHistory = [];
+                    document.getElementById("chat-box").innerHTML = "";
+                    localStorage.setItem('chatHistory', JSON.stringify(chatHistory));
+                    alert("Chat history cleared!");
+                    playSound('click');
+                }
+            }
+
+            function updateMatchHistory(username) {
+                if (!username || !userData[username] || userData[username].isBanned) return;
+                const historyDiv = document.getElementById("history-list");
+                historyDiv.innerHTML = userData[username].history.map(match => `<p>${match}</p>`).join('') || "<p>No matches yet.</p>";
+            }
+
+            function fetchRealStats() {
+                if (!currentUser || !userData[currentUser] || userData[currentUser].isBanned) return;
+                const simulatedStats = { kills: Math.floor(Math.random() * 50), deaths: Math.floor(Math.random() * 20) };
+                userData[currentUser].kills = simulatedStats.kills;
+                userData[currentUser].deaths = simulatedStats.deaths;
+                saveUserData();
                 updateProfile(currentUser);
-            }
-        }
-
-        function joinMatchmaking() {
-            if (userData[currentUser]?.isBanned) return;
-            if (!isLoggedIn) return alert("You must be logged in to join matchmaking!");
-            if (matchmakingQueue.includes(currentUser)) {
-                alert("You are already in the matchmaking queue!");
-                return;
-            }
-            const team = assignTeam(currentUser);
-            matchmakingQueue.push(currentUser);
-            userData[currentUser].friends.forEach(f => {
-                if (userData[f]) alert(`${userData[currentUser].activeTitle || "Rookie"} ${currentUser} joined matchmaking on ${team} team!`);
-            });
-            alert(`Added to matchmaking queue on ${team} team! Waiting for players...`);
-            playSound('click');
-            setTimeout(checkMatchmaking, 5000);
-        }
-
-        function checkMatchmaking() {
-            if (userData[currentUser]?.isBanned) return;
-            const totalPlayers = teams.red.length + teams.pink.length + teams.green.length;
-            if (totalPlayers >= 18) {
-                alert(`Match started! Teams - Red: ${teams.red.join(', ')}, Pink: ${teams.pink.join(', ')}, Green: ${teams.green.join(', ')}`);
-                teams.red.forEach(u => { if (Math.random() < 0.33) userData[u].wins += 1; });
-                teams.pink.forEach(u => { if (Math.random() < 0.33) userData[u].wins += 1; });
-                teams.green.forEach(u => { if (Math.random() < 0.33) userData[u].wins += 1; });
-                matchmakingQueue = [];
-                for (let user in userData) userData[user].team = null;
-                teams.red = []; teams.pink = []; teams.green = [];
-                localStorage.setItem('userData', JSON.stringify(userData));
                 playSound('fanfare');
-                if (currentUser) updateProfile(currentUser);
-            } else if (matchmakingQueue.length > 0) {
-                setTimeout(checkMatchmaking, 5000);
+                alert("Stats refreshed from game! (Simulated)");
             }
-        }
 
-        function addFriend() {
-            if (userData[currentUser]?.isBanned) return;
-            const friend = document.getElementById("friend-username").value.trim();
-            if (!friend) return alert("Please enter a username.");
-            if (friend === currentUser) return alert("You cannot add yourself!");
-            if (userData[friend]) {
-                if (!userData[currentUser].friends.includes(friend)) {
-                    userData[currentUser].friends.push(friend);
-                    localStorage.setItem('userData', JSON.stringify(userData));
+            function changePassword() {
+                if (!currentUser || !userData[currentUser] || userData[currentUser].isBanned) return;
+                if (!isLoggedIn) return alert("You must be logged in to change your password!");
+                const currentPass = document.getElementById("current-password").value;
+                const newPass = document.getElementById("new-password").value;
+                if (!currentPass || !newPass) return alert("Please enter both current and new passwords.");
+                if (userData[currentUser].password === currentPass) {
+                    if (newPass.length < 6) {
+                        alert("New password must be at least 6 characters long!");
+                        return;
+                    }
+                    userData[currentUser].password = newPass;
+                    saveUserData();
+                    alert("Password changed successfully!");
+                    document.getElementById("current-password").value = "";
+                    document.getElementById("new-password").value = "";
+                    playSound('fanfare');
+                } else {
+                    alert("Current password is incorrect!");
+                }
+            }
+
+            function setBio() {
+                if (!currentUser || !userData[currentUser] || userData[currentUser].isBanned) return;
+                const bio = document.getElementById("bio-input").value.trim();
+                if (bio.length > 50) return alert("Bio cannot exceed 50 characters!");
+                userData[currentUser].bio = bio;
+                saveUserData();
+                updateProfile(currentUser);
+                alert("Bio updated!");
+                playSound('click');
+            }
+
+            function checkDailyReward() {
+                if (!currentUser || !userData[currentUser] || userData[currentUser].isBanned) return;
+                const today = new Date().toDateString();
+                if (userData[currentUser].lastLogin !== today) {
+                    userData[currentUser].kills += 5;
+                    userData[currentUser].lastLogin = today;
+                    saveUserData();
+                    alert("Daily login reward: +5 kills!");
+                    playSound('fanfare');
+                    updateProfile(currentUser);
+                }
+            }
+
+            function joinMatchmaking() { // Fix 5: Use interval
+                if (!currentUser || !userData[currentUser] || userData[currentUser].isBanned) return;
+                if (!isLoggedIn) return alert("You must be logged in to join matchmaking!");
+                if (matchmakingQueue.includes(currentUser)) {
+                    alert("You are already in the matchmaking queue!");
+                    return;
+                }
+                const team = assignTeam(currentUser);
+                matchmakingQueue.push(currentUser);
+                userData[currentUser].friends.forEach(f => {
+                    if (userData[f]) alert(`${userData[currentUser].activeTitle || "Rookie"} ${currentUser} joined matchmaking on ${team} team!`);
+                });
+                alert(`Added to matchmaking queue on ${team} team! Waiting for players...`);
+                playSound('click');
+                if (!matchmakingInterval) {
+                    matchmakingInterval = setInterval(checkMatchmaking, 5000);
+                }
+            }
+
+            function checkMatchmaking() { // Fix 5: Clear interval
+                if (!currentUser || !userData[currentUser] || userData[currentUser].isBanned) return;
+                const totalPlayers = teams.red.length + teams.pink.length + teams.green.length;
+                if (totalPlayers >= 18) {
+                    clearInterval(matchmakingInterval);
+                    matchmakingInterval = null;
+                    alert(`Match started! Teams - Red: ${teams.red.join(', ')}, Pink: ${teams.pink.join(', ')}, Green: ${teams.green.join(', ')}`);
+                    teams.red.forEach(u => { if (Math.random() < 0.33) userData[u].wins += 1; });
+                    teams.pink.forEach(u => { if (Math.random() < 0.33) userData[u].wins += 1; });
+                    teams.green.forEach(u => { if (Math.random() < 0.33) userData[u].wins += 1; });
+                    matchmakingQueue = [];
+                    for (let user in userData) userData[user].team = null;
+                    teams.red = []; teams.pink = []; teams.green = [];
+                    saveUserData();
+                    playSound('fanfare');
+                    if (currentUser) updateProfile(currentUser);
+                }
+            }
+
+            function addFriend() {
+                if (!currentUser || !userData[currentUser] || userData[currentUser].isBanned) return;
+                const friend = document.getElementById("friend-username").value.trim();
+                if (!friend) return alert("Please enter a username.");
+                if (friend === currentUser) return alert("You cannot add yourself!");
+                if (userData[friend]) {
+                    if (!userData[currentUser].friends.includes(friend)) {
+                        userData[currentUser].friends.push(friend);
+                        saveUserData();
+                        updateFriendList();
+                        alert(`${friend} added to your friends list!`);
+                        playSound('click');
+                    } else {
+                        alert("This user is already your friend!");
+                    }
+                } else {
+                    alert("User not found!");
+                }
+            }
+
+            function removeFriend(friend) {
+                if (!currentUser || !userData[currentUser] || userData[currentUser].isBanned) return;
+                if (confirm(`Are you sure you want to remove ${friend} from your friends list?`)) {
+                    userData[currentUser].friends = userData[currentUser].friends.filter(f => f !== friend);
+                    saveUserData();
                     updateFriendList();
-                    alert(`${friend} added to your friends list!`);
+                    alert(`${friend} removed from your friends list!`);
+                    playSound('click');
+                    checkEmptyGroups();
+                }
+            }
+
+            function inviteFriendToGroup(friend) {
+                if (!currentUser || !userData[currentUser] || userData[currentUser].isBanned) return;
+                const groupName = prompt(`Enter group chat name to invite ${friend} to:`).trim();
+                if (!groupName || !groupChats[groupName]) {
+                    alert("Please enter a valid group chat name that exists!");
+                    return;
+                }
+                if (!groupChats[groupName].members.includes(currentUser)) {
+                    alert("You must be a member of the group to invite others!");
+                    return;
+                }
+                if (groupChats[groupName].members.includes(friend)) {
+                    alert(`${friend} is already in this group!`);
+                    return;
+                }
+                groupChats[groupName].members.push(friend);
+                localStorage.setItem('groupChats', JSON.stringify(groupChats));
+                alert(`${friend} invited to "${groupName}"!`);
+                playSound('click');
+            }
+
+            function updateFriendList() {
+                if (!currentUser || !userData[currentUser] || userData[currentUser].isBanned) return;
+                const friendList = document.getElementById("friend-list");
+                friendList.innerHTML = userData[currentUser].friends.map(f => {
+                    const status = Math.random() < 0.5 ? "Online" : "In-Game";
+                    const title = userData[f].activeTitle || "Rookie";
+                    const team = userData[f].team ? userData[f].team : "None";
+                    return `<p>${title} ${f} - ${status} (Team: ${team}) 
+                        <button class="friend-button" onclick="inviteFriendToGroup('${f}')">Invite</button>
+                        <button class="friend-button" onclick="removeFriend('${f}')">Remove</button></p>`;
+                }).join('') || "<p>No friends yet.</p>";
+            }
+
+            function populateGroupMembers() {
+                if (!currentUser || !userData[currentUser] || userData[currentUser].isBanned) return;
+                const select = document.getElementById("group-members");
+                select.innerHTML = userData[currentUser].friends.map(f => `<option value="${f}">${f}</option>`).join('') || "<option value=''>No friends to add</option>";
+            }
+
+            function createGroupChat() {
+                if (!currentUser || !userData[currentUser] || userData[currentUser].isBanned) return;
+                const groupName = document.getElementById("group-chat-name").value.trim();
+                if (!groupName) return alert("Please enter a group name.");
+                if (groupChats[groupName]) return alert("Group already exists!");
+                const membersSelect = document.getElementById("group-members");
+                const selectedMembers = Array.from(membersSelect.selectedOptions).map(option => option.value);
+                if (selectedMembers.length === 0 || (selectedMembers.length === 1 && selectedMembers[0] === '')) {
+                    alert("You must add at least one friend to the group chat!");
+                    return;
+                }
+                groupChats[groupName] = {
+                    messages: [],
+                    members: [currentUser, ...selectedMembers]
+                };
+                localStorage.setItem('groupChats', JSON.stringify(groupChats));
+                updateGroupChatSelect();
+                document.getElementById("group-chat-select").value = groupName;
+                switchGroupChat();
+                alert(`Group "${groupName}" created with members: ${groupChats[groupName].members.join(', ')}!`);
+                playSound('click');
+                checkEmptyGroups();
+            }
+
+            function checkEmptyGroups() {
+                if (!currentUser || !userData[currentUser] || userData[currentUser].isBanned) return;
+                for (let groupName in groupChats) {
+                    const members = groupChats[groupName].members.filter(m => userData[m] && !userData[m].isBanned);
+                    if (members.length <= 1) {
+                        delete groupChats[groupName];
+                        alert(`Group "${groupName}" removed due to insufficient members!`);
+                        playSound('click');
+                    }
+                }
+                localStorage.setItem('groupChats', JSON.stringify(groupChats));
+                updateGroupChatSelect();
+            }
+
+            function updateGroupChatSelect() {
+                if (!currentUser || !userData[currentUser] || userData[currentUser].isBanned) return;
+                const select = document.getElementById("group-chat-select");
+                select.innerHTML = "<option value=''>Select a group</option>" + Object.keys(groupChats).map(name => `<option value="${name}">${name}</option>`).join('');
+            }
+
+            function switchGroupChat() {
+                if (!currentUser || !userData[currentUser] || userData[currentUser].isBanned) return;
+                const groupName = document.getElementById("group-chat-select").value;
+                if (groupName && groupChats[groupName]) {
+                    document.getElementById("group-chat-box").innerHTML = groupChats[groupName].messages.join('');
+                } else {
+                    document.getElementById("group-chat-box").innerHTML = "<p>Select a group to chat.</p>";
+                }
+            }
+
+            function sendGroupChat() {
+                if (!currentUser || !userData[currentUser] || userData[currentUser].isBanned) return;
+                const groupName = document.getElementById("group-chat-select").value;
+                const message = document.getElementById("group-chat-input").value.trim();
+                if (!groupName) return alert("Please select a group.");
+                if (!message) return alert("Please enter a message.");
+                if (!groupChats[groupName].members.includes(currentUser)) return alert("You are not a member of this group!");
+                const title = userData[currentUser].activeTitle || "Rookie";
+                const groupMessage = `<p><b>${title} ${currentUser}:</b> ${replaceEmotes(message)}</p>`;
+                groupChats[groupName].messages.push(groupMessage);
+                localStorage.setItem('groupChats', JSON.stringify(groupChats));
+                document.getElementById("group-chat-box").innerHTML += groupMessage;
+                document.getElementById("group-chat-input").value = "";
+                playSound('click');
+                document.getElementById("group-chat-box").scrollTop = document.getElementById("group-chat-box").scrollHeight;
+            }
+
+            function sendPrivateMessage() {
+                if (!currentUser || !userData[currentUser] || userData[currentUser].isBanned) return;
+                const recipient = document.getElementById("message-recipient").value.trim();
+                const message = document.getElementById("message-input").value.trim();
+                if (!recipient || !message) return alert("Please enter a recipient and message.");
+                if (userData[recipient]) {
+                    const title = userData[currentUser].activeTitle || "Rookie";
+                    const msg = { from: currentUser, text: replaceEmotes(message), time: new Date().toLocaleString(), title: title };
+                    userData[recipient].messages.push(msg);
+                    userData[currentUser].messages.push(msg);
+                    saveUserData();
+                    document.getElementById("message-input").value = "";
+                    updateMessages();
+                    alert(`Message sent to ${recipient}!`);
                     playSound('click');
                 } else {
-                    alert("This user is already your friend!");
-                }
-            } else {
-                alert("User not found!");
-            }
-        }
-
-        function removeFriend(friend) {
-            if (userData[currentUser]?.isBanned) return;
-            if (confirm(`Are you sure you want to remove ${friend} from your friends list?`)) {
-                userData[currentUser].friends = userData[currentUser].friends.filter(f => f !== friend);
-                localStorage.setItem('userData', JSON.stringify(userData));
-                updateFriendList();
-                alert(`${friend} removed from your friends list!`);
-                playSound('click');
-                checkEmptyGroups();
-            }
-        }
-
-        function inviteFriendToGroup(friend) {
-            if (userData[currentUser]?.isBanned) return;
-            const groupName = prompt(`Enter group chat name to invite ${friend} to:`).trim();
-            if (!groupName || !groupChats[groupName]) {
-                alert("Please enter a valid group chat name that exists!");
-                return;
-            }
-            if (!groupChats[groupName].members.includes(currentUser)) {
-                alert("You must be a member of the group to invite others!");
-                return;
-            }
-            if (groupChats[groupName].members.includes(friend)) {
-                alert(`${friend} is already in this group!`);
-                return;
-            }
-            groupChats[groupName].members.push(friend);
-            localStorage.setItem('groupChats', JSON.stringify(groupChats));
-            alert(`${friend} invited to "${groupName}"!`);
-            playSound('click');
-        }
-
-        function updateFriendList() {
-            if (userData[currentUser]?.isBanned) return;
-            const friendList = document.getElementById("friend-list");
-            friendList.innerHTML = userData[currentUser].friends.map(f => {
-                const status = Math.random() < 0.5 ? "Online" : "In-Game";
-                const title = userData[f].activeTitle || "Rookie";
-                const team = userData[f].team ? userData[f].team : "None";
-                return `<p>${title} ${f} - ${status} (Team: ${team}) 
-                    <button class="friend-button" onclick="inviteFriendToGroup('${f}')">Invite</button>
-                    <button class="friend-button" onclick="removeFriend('${f}')">Remove</button></p>`;
-            }).join('') || "<p>No friends yet.</p>";
-        }
-
-        function populateGroupMembers() {
-            if (userData[currentUser]?.isBanned) return;
-            const select = document.getElementById("group-members");
-            select.innerHTML = userData[currentUser].friends.map(f => `<option value="${f}">${f}</option>`).join('') || "<option value=''>No friends to add</option>";
-        }
-
-        function createGroupChat() {
-            if (userData[currentUser]?.isBanned) return;
-            const groupName = document.getElementById("group-chat-name").value.trim();
-            if (!groupName) return alert("Please enter a group name.");
-            if (groupChats[groupName]) return alert("Group already exists!");
-            const membersSelect = document.getElementById("group-members");
-            const selectedMembers = Array.from(membersSelect.selectedOptions).map(option => option.value);
-            if (selectedMembers.length === 0 || (selectedMembers.length === 1 && selectedMembers[0] === '')) {
-                alert("You must add at least one friend to the group chat!");
-                return;
-            }
-            groupChats[groupName] = {
-                messages: [],
-                members: [currentUser, ...selectedMembers]
-            };
-            localStorage.setItem('groupChats', JSON.stringify(groupChats));
-            updateGroupChatSelect();
-            document.getElementById("group-chat-select").value = groupName;
-            switchGroupChat();
-            alert(`Group "${groupName}" created with members: ${groupChats[groupName].members.join(', ')}!`);
-            playSound('click');
-            checkEmptyGroups();
-        }
-
-        function checkEmptyGroups() {
-            if (userData[currentUser]?.isBanned) return;
-            for (let groupName in groupChats) {
-                const members = groupChats[groupName].members.filter(m => userData[m] && !userData[m].isBanned);
-                if (members.length <= 1) {
-                    delete groupChats[groupName];
-                    alert(`Group "${groupName}" removed due to insufficient members!`);
-                    playSound('click');
+                    alert("Recipient not found!");
                 }
             }
-            localStorage.setItem('groupChats', JSON.stringify(groupChats));
-            updateGroupChatSelect();
-        }
 
-        function updateGroupChatSelect() {
-            if (userData[currentUser]?.isBanned) return;
-            const select = document.getElementById("group-chat-select");
-            select.innerHTML = "<option value=''>Select a group</option>" + Object.keys(groupChats).map(name => `<option value="${name}">${name}</option>`).join('');
-        }
-
-        function switchGroupChat() {
-            if (userData[currentUser]?.isBanned) return;
-            const groupName = document.getElementById("group-chat-select").value;
-            if (groupName && groupChats[groupName]) {
-                document.getElementById("group-chat-box").innerHTML = groupChats[groupName].messages.join('');
-            } else {
-                document.getElementById("group-chat-box").innerHTML = "<p>Select a group to chat.</p>";
+            function updateMessages() {
+                if (!currentUser || !userData[currentUser] || userData[currentUser].isBanned) return;
+                const messageBox = document.getElementById("message-box");
+                messageBox.innerHTML = userData[currentUser].messages.map(m => 
+                    `<p><b>${m.title} ${m.from}:</b> ${m.text} (${m.time})</p>`
+                ).join('') || "<p>No messages yet.</p>";
             }
-        }
 
-        function sendGroupChat() {
-            if (userData[currentUser]?.isBanned) return;
-            const groupName = document.getElementById("group-chat-select").value;
-            const message = document.getElementById("group-chat-input").value.trim();
-            if (!groupName) return alert("Please select a group.");
-            if (!message) return alert("Please enter a message.");
-            if (!groupChats[groupName].members.includes(currentUser)) return alert("You are not a member of this group!");
-            const title = userData[currentUser].activeTitle || "Rookie";
-            const groupMessage = `<p><b>${title} ${currentUser}:</b> ${replaceEmotes(message)}</p>`;
-            groupChats[groupName].messages.push(groupMessage);
-            localStorage.setItem('groupChats', JSON.stringify(groupChats));
-            document.getElementById("group-chat-box").innerHTML += groupMessage;
-            document.getElementById("group-chat-input").value = "";
-            playSound('click');
-            document.getElementById("group-chat-box").scrollTop = document.getElementById("group-chat-box").scrollHeight;
-        }
-
-        function sendPrivateMessage() {
-            if (userData[currentUser]?.isBanned) return;
-            const recipient = document.getElementById("message-recipient").value.trim();
-            const message = document.getElementById("message-input").value.trim();
-            if (!recipient || !message) return alert("Please enter a recipient and message.");
-            if (userData[recipient]) {
-                const title = userData[currentUser].activeTitle || "Rookie";
-                const msg = { from: currentUser, text: replaceEmotes(message), time: new Date().toLocaleString(), title: title };
-                userData[recipient].messages.push(msg);
-                userData[currentUser].messages.push(msg);
-                localStorage.setItem('userData', JSON.stringify(userData));
-                document.getElementById("message-input").value = "";
-                updateMessages();
-                alert(`Message sent to ${recipient}!`);
-                playSound('click');
-            } else {
-                alert("Recipient not found!");
-            }
-        }
-
-        function updateMessages() {
-            if (userData[currentUser]?.isBanned) return;
-            const messageBox = document.getElementById("message-box");
-            messageBox.innerHTML = userData[currentUser].messages.map(m => 
-                `<p><b>${m.title} ${m.from}:</b> ${m.text} (${m.time})</p>`
-            ).join('') || "<p>No messages yet.</p>";
-        }
-
-        function banUser() {
-            if (userData[currentUser]?.isBanned || !userData[currentUser]?.isAdmin) return alert("You are not an admin or are banned!");
-            const target = document.getElementById("admin-target").value.trim();
-            const reason = document.getElementById("ban-reason").value.trim();
-            if (!target) return alert("Please enter a username to ban.");
-            if (target === currentUser) return alert("You cannot ban yourself!");
-            if (userData[target]) {
-                if (userData[target].isOwner) return alert("You cannot ban the owner!");
-                userData[target].isBanned = true;
-                userData[target].banReason = reason || "No reason provided";
-                if (userData[target].team) teams[userData[target].team] = teams[userData[target].team].filter(u => u !== target);
-                userData[target].team = null;
-                localStorage.setItem('userData', JSON.stringify(userData));
-                alert(`${target} has been banned! Reason: ${userData[target].banReason}`);
-                playSound('click');
-                updateLeaderboard();
-                checkEmptyGroups();
-                if (target === currentUser) showBannedNotice();
-            } else {
-                alert("User not found!");
-            }
-        }
-
-        function unbanUser() {
-            if (userData[currentUser]?.isBanned || !userData[currentUser]?.isAdmin) return alert("You are not an admin or are banned!");
-            const target = document.getElementById("admin-target").value.trim();
-            if (!target) return alert("Please enter a username to unban.");
-            if (userData[target]) {
-                userData[target].isBanned = false;
-                userData[target].banReason = '';
-                localStorage.setItem('userData', JSON.stringify(userData));
-                alert(`${target} has been unbanned!`);
-                playSound('click');
-                updateLeaderboard();
-            } else {
-                alert("User not found!");
-            }
-        }
-
-        function makeAdmin() {
-            if (userData[currentUser]?.isBanned || !userData[currentUser]?.isAdmin) return alert("You are not an admin or are banned!");
-            const target = document.getElementById("admin-target").value.trim();
-            if (!target) return alert("Please enter a username.");
-            if (target === currentUser) return alert("You are already an admin!");
-            if (userData[target]) {
-                userData[target].isAdmin = true;
-                localStorage.setItem('userData', JSON.stringify(userData));
-                alert(`${target} is now an admin!`);
-                playSound('fanfare');
-            } else {
-                alert("User not found!");
-            }
-        }
-
-        function removeAdmin() {
-            if (userData[currentUser]?.isBanned || !userData[currentUser]?.isAdmin) return alert("You are not an admin or are banned!");
-            const target = document.getElementById("admin-target").value.trim();
-            if (!target) return alert("Please enter a username.");
-            if (target === currentUser) return alert("You cannot remove your own admin status!");
-            if (target === 'Halaldeveloper') return alert("You cannot remove the owner's admin status!");
-            if (userData[target]) {
-                userData[target].isAdmin = false;
-                localStorage.setItem('userData', JSON.stringify(userData));
-                alert(`${target} is no longer an admin!`);
-                playSound('click');
-            } else {
-                alert("User not found!");
-            }
-        }
-
-        function resetUserStats() {
-            if (userData[currentUser]?.isBanned || !userData[currentUser]?.isAdmin) return alert("You are not an admin or are banned!");
-            const target = document.getElementById("admin-target").value.trim();
-            if (!target) return alert("Please enter a username.");
-            if (userData[target]) {
-                userData[target].kills = 0;
-                userData[target].deaths = 0;
-                userData[target].gamesPlayed = 0;
-                userData[target].wins = 0;
-                userData[target].history = [];
-                userData[target].titles = ["Rookie"];
-                userData[target].activeTitle = "Rookie";
-                localStorage.setItem('userData', JSON.stringify(userData));
-                alert(`${target}'s stats have been reset!`);
-                playSound('click');
-                if (target === currentUser) updateProfile(currentUser);
-            } else {
-                alert("User not found!");
-            }
-        }
-
-        function massBan() {
-            if (userData[currentUser]?.isBanned || !userData[currentUser]?.isAdmin) return alert("You are not an admin or are banned!");
-            const targets = prompt("Enter usernames to ban (comma-separated):")?.trim();
-            const reason = document.getElementById("ban-reason").value.trim();
-            if (!targets) return alert("Please enter at least one username.");
-            const userList = targets.split(',').map(t => t.trim());
-            let banned = [];
-            userList.forEach(target => {
-                if (userData[target] && target !== currentUser && !userData[target].isOwner) {
+            function banUser() {
+                if (!currentUser || !userData[currentUser] || userData[currentUser].isBanned || !userData[currentUser]?.isAdmin) return alert("You are not an admin or are banned!");
+                const target = document.getElementById("admin-target").value.trim();
+                const reason = document.getElementById("ban-reason").value.trim();
+                if (!target) return alert("Please enter a username to ban.");
+                if (target === currentUser) return alert("You cannot ban yourself!");
+                if (userData[target]) {
+                    if (userData[target].isOwner) return alert("You cannot ban the owner!");
                     userData[target].isBanned = true;
-                    userData[target].banReason = reason || "Mass ban - no reason provided";
+                    userData[target].banReason = reason || "No reason provided";
                     if (userData[target].team) teams[userData[target].team] = teams[userData[target].team].filter(u => u !== target);
                     userData[target].team = null;
-                    banned.push(target);
+                    saveUserData();
+                    alert(`${target} has been banned! Reason: ${userData[target].banReason}`);
+                    playSound('click');
+                    updateLeaderboard();
+                    checkEmptyGroups();
+                    if (target === currentUser) showBannedNotice();
+                } else {
+                    alert("User not found!");
                 }
-            });
-            localStorage.setItem('userData', JSON.stringify(userData));
-            alert(`Banned: ${banned.join(', ') || 'None'}`);
-            playSound('click');
-            updateLeaderboard();
-            checkEmptyGroups();
-            if (banned.includes(currentUser)) showBannedNotice();
-        }
+            }
 
-        function massUnban() {
-            if (userData[currentUser]?.isBanned || !userData[currentUser]?.isAdmin) return alert("You are not an admin or are banned!");
-            const targets = prompt("Enter usernames to unban (comma-separated):")?.trim();
-            if (!targets) return alert("Please enter at least one username.");
-            const userList = targets.split(',').map(t => t.trim());
-            let unbanned = [];
-            userList.forEach(target => {
+            function unbanUser() {
+                if (!currentUser || !userData[currentUser] || userData[currentUser].isBanned || !userData[currentUser]?.isAdmin) return alert("You are not an admin or are banned!");
+                const target = document.getElementById("admin-target").value.trim();
+                if (!target) return alert("Please enter a username to unban.");
                 if (userData[target]) {
                     userData[target].isBanned = false;
                     userData[target].banReason = '';
-                    unbanned.push(target);
+                    saveUserData();
+                    alert(`${target} has been unbanned!`);
+                    playSound('click');
+                    updateLeaderboard();
+                } else {
+                    alert("User not found!");
                 }
-            });
-            localStorage.setItem('userData', JSON.stringify(userData));
-            alert(`Unbanned: ${unbanned.join(', ') || 'None'}`);
-            playSound('click');
-            updateLeaderboard();
-        }
+            }
 
-        function exportData() {
-            if (userData[currentUser]?.isBanned) return;
-            const data = {
-                userData: userData,
-                chatHistory: chatHistory,
-                groupChats: groupChats,
-                soundSettings: soundSettings,
-                teams: teams
-            };
-            const json = JSON.stringify(data, null, 2);
-            const blob = new Blob([json], { type: "application/json" });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement("a");
-            a.href = url;
-            a.download = "laser_tag_data.json";
-            a.click();
-            URL.revokeObjectURL(url);
-            alert("Data exported! Save this file to import later.");
-            playSound('click');
-        }
+            function makeAdmin() {
+                if (!currentUser || !userData[currentUser] || userData[currentUser].isBanned || !userData[currentUser]?.isAdmin) return alert("You are not an admin or are banned!");
+                const target = document.getElementById("admin-target").value.trim();
+                if (!target) return alert("Please enter a username.");
+                if (target === currentUser) return alert("You are already an admin!");
+                if (userData[target]) {
+                    userData[target].isAdmin = true;
+                    saveUserData();
+                    alert(`${target} is now an admin!`);
+                    playSound('fanfare');
+                } else {
+                    alert("User not found!");
+                }
+            }
+
+            function removeAdmin() {
+                if (!currentUser || !userData[currentUser] || userData[currentUser].isBanned || !userData[currentUser]?.isAdmin) return alert("You are not an admin or are banned!");
+                const target = document.getElementById("admin-target").value.trim();
+                if (!target) return alert("Please enter a username.");
+                if (target === currentUser) return alert("You cannot remove your own admin status!");
+                if (target === 'Halaldeveloper') return alert("You cannot remove the owner's admin status!");
+                if (userData[target]) {
+                    userData[target].isAdmin = false;
+                    saveUserData();
+                    alert(`${target} is no longer an admin!`);
+                    playSound('click');
+                } else {
+                    alert("User not found!");
+                }
+            }
+
+            function resetUserStats() {
+                if (!currentUser || !userData[currentUser] || userData[currentUser].isBanned || !userData[currentUser]?.isAdmin) return alert("You are not an admin or are banned!");
+                const target = document.getElementById("admin-target").value.trim();
+                if (!target) return alert("Please enter a username.");
+                if (userData[target]) {
+                    userData[target].kills = 0;
+                    userData[target].deaths = 0;
+                    userData[target].gamesPlayed = 0;
+                    userData[target].wins = 0;
+                    userData[target].history = [];
+                    userData[target].titles = ["Rookie"];
+                    userData[target].activeTitle = "Rookie";
+                    saveUserData();
+                    alert(`${target}'s stats have been reset!`);
+                    playSound('click');
+                    if (target === currentUser) updateProfile(currentUser);
+                } else {
+                    alert("User not found!");
+                }
+            }
+
+            function massBan() {
+                if (!currentUser || !userData[currentUser] || userData[currentUser].isBanned || !userData[currentUser]?.isAdmin) return alert("You are not an admin or are banned!");
+                const targets = prompt("Enter usernames to ban (comma-separated):")?.trim();
+                const reason = document.getElementById("ban-reason").value.trim();
+                if (!targets) return alert("Please enter at least one username.");
+                const userList = targets.split(',').map(t => t.trim());
+                let banned = [];
+                userList.forEach(target => {
+                    if (userData[target] && target !== currentUser && !userData[target].isOwner) {
+                        userData[target].isBanned = true;
+                        userData[target].banReason = reason || "Mass ban - no reason provided";
+                        if (userData[target].team) teams[userData[target].team] = teams[userData[target].team].filter(u => u !== target);
+                        userData[target].team = null;
+                        banned.push(target);
+                    }
+                });
+                saveUserData();
+                alert(`Banned: ${banned.join(', ') || 'None'}`);
+                playSound('click');
+                updateLeaderboard();
+                checkEmptyGroups();
+                if (banned.includes(currentUser)) showBannedNotice();
+            }
+
+            function massUnban() {
+                if (!currentUser || !userData[currentUser] || userData[currentUser].isBanned || !userData[currentUser]?.isAdmin) return alert("You are not an admin or are banned!");
+                const targets = prompt("Enter usernames to unban (comma-separated):")?.trim();
+                if (!targets) return alert("Please enter at least one username.");
+                const userList = targets.split(',').map(t => t.trim());
+                let unbanned = [];
+                userList.forEach(target => {
+                    if (userData[target]) {
+                        userData[target].isBanned = false;
+                        userData[target].banReason = '';
+                        unbanned.push(target);
+                    }
+                });
+                saveUserData();
+                alert(`Unbanned: ${unbanned.join(', ') || 'None'}`);
+                playSound('click');
+                updateLeaderboard();
+            }
+
+            function exportData() {
+                if (!currentUser || !userData[currentUser] || userData[currentUser].isBanned) return;
+                const data = {
+                    userData: userData,
+                    chatHistory: chatHistory,
+                    groupChats: groupChats,
+                    soundSettings: soundSettings,
+                    teams: teams
+                };
+                const json = JSON.stringify(data, null, 2);
+                const blob = new Blob([json], { type: "application/json" });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement("a");
+                a.href = url;
+                a.download = "laser_tag_data.json";
+                a.click();
+                URL.revokeObjectURL(url);
+                alert("Data exported! Save this file to import later.");
+                playSound('click');
+            }
+        });
     </script>
 </body>
 </html>
