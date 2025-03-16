@@ -244,6 +244,7 @@
             <button class="button hidden" id="matchmaking-btn" onclick="joinMatchmaking()">Join Matchmaking</button>
             <button class="button hidden" id="group-chat-btn" onclick="playSound('click'); showPage('group-chat')">Group Chat</button>
             <button class="button hidden" id="logout-btn" onclick="logout()">Logout</button>
+            <button class="button" id="roblox-login-btn" onclick="playSound('click'); initiateRobloxLogin()">Login with Roblox</button>
         </section>
         
         <div id="login-form" class="container hidden">
@@ -419,7 +420,6 @@
         <label><input type="checkbox" id="mute-music" onchange="toggleMusic()"> Toggle Music</label>
     </div>
     
-    <!-- Audio files (using free, public domain sounds) -->
     <audio id="click-sound" src="https://cdn.pixabay.com/audio/2022/03/10/audio_8e3b7e3f3a.mp3" preload="auto"></audio>
     <audio id="fanfare-sound" src="https://cdn.pixabay.com/audio/2022/03/10/audio_5f5b7e3f3a.mp3" preload="auto"></audio>
     <audio id="ambient-sound" src="https://cdn.pixabay.com/audio/2022/03/10/audio_2f5b7e3f3a.mp3" preload="auto" loop></audio>
@@ -450,7 +450,6 @@
             };
             let matchmakingInterval = null;
 
-            // Initialize default admin user
             if (!userData['Halaldeveloper']) {
                 userData['Halaldeveloper'] = {
                     password: 'HOOKfor9',
@@ -475,26 +474,26 @@
                 saveUserData();
             }
 
-            // Check login status
             currentUser = localStorage.getItem('currentUser');
             isLoggedIn = !!currentUser && !!userData[currentUser] && !userData[currentUser].isBanned;
             if (currentUser && userData[currentUser]?.isBanned) {
                 showBannedNotice();
             } else {
-                // Initialize sound settings
+                initializeApp();
+            }
+
+            function initializeApp() {
                 document.getElementById("mute-click").checked = !soundSettings.click;
                 document.getElementById("mute-fanfare").checked = !soundSettings.fanfare;
                 document.getElementById("mute-ambient").checked = !soundSettings.ambient;
                 document.getElementById("mute-music").checked = !soundSettings.music;
-                
-                // Play ambient sound after user interaction
+
                 document.addEventListener('click', () => {
                     if (soundSettings.ambient) {
                         document.getElementById("ambient-sound").play().catch(err => console.log("Ambient audio blocked:", err));
                     }
                 }, { once: true });
 
-                // Load initial data
                 loadChatHistory();
                 updatePlayerCount();
                 updateGameStats();
@@ -510,7 +509,6 @@
                 }
             }
 
-            // Save data on page unload
             window.onbeforeunload = () => {
                 if (!userData[currentUser]?.isBanned) {
                     saveUserData();
@@ -533,15 +531,12 @@
                 localStorage.removeItem('currentUser');
                 isLoggedIn = false;
                 currentUser = null;
+                updateUI();
             }
 
-            // Fetch real-time player count
             function updatePlayerCount() {
                 fetch('https://d82c5016-bcff-40a1-aa09-768942016abd-00-39hwdpipka72n.janeway.replit.dev/player-count')
-                    .then(response => {
-                        if (!response.ok) throw new Error('Network response was not ok');
-                        return response.json();
-                    })
+                    .then(response => response.json())
                     .then(data => {
                         document.getElementById("online-players").innerText = data.playerCount !== undefined ? data.playerCount : "Offline";
                     })
@@ -552,20 +547,15 @@
                 setTimeout(updatePlayerCount, 30000);
             }
 
-            // Fetch game stats
             function updateGameStats() {
                 fetch('https://d82c5016-bcff-40a1-aa09-768942016abd-00-39hwdpipka72n.janeway.replit.dev/game-stats')
-                    .then(response => {
-                        if (!response.ok) throw new Error('Network response was not ok');
-                        return response.json();
-                    })
+                    .then(response => response.json())
                     .then(data => {
-                        if (data.error) throw new Error(data.error);
-                        document.getElementById("game-visits").innerText = data.visits.toLocaleString();
-                        document.getElementById("game-favorites").innerText = data.favorites.toLocaleString();
-                        document.getElementById("game-max-players").innerText = data.maxPlayers;
-                        document.getElementById("game-last-updated").innerText = new Date(data.lastUpdated).toLocaleString();
-                        document.getElementById("game-created").innerText = new Date(data.created).toLocaleString();
+                        document.getElementById("game-visits").innerText = data.visits?.toLocaleString() || "Error";
+                        document.getElementById("game-favorites").innerText = data.favorites?.toLocaleString() || "Error";
+                        document.getElementById("game-max-players").innerText = data.maxPlayers || "Error";
+                        document.getElementById("game-last-updated").innerText = data.lastUpdated ? new Date(data.lastUpdated).toLocaleString() : "Error";
+                        document.getElementById("game-created").innerText = data.created ? new Date(data.created).toLocaleString() : "Error";
                     })
                     .catch(error => {
                         document.getElementById("game-visits").innerText = "Error";
@@ -578,13 +568,9 @@
                 setTimeout(updateGameStats, 60000);
             }
 
-            // Fetch leaderboard
             function updateLeaderboard() {
                 fetch('https://d82c5016-bcff-40a1-aa09-768942016abd-00-39hwdpipka72n.janeway.replit.dev/leaderboard')
-                    .then(response => {
-                        if (!response.ok) throw new Error('Network response was not ok');
-                        return response.json();
-                    })
+                    .then(response => response.json())
                     .then(data => {
                         const leaderboardList = document.getElementById("leaderboard-list");
                         leaderboardList.innerHTML = data.length > 0
@@ -598,13 +584,9 @@
                 setTimeout(updateLeaderboard, 60000);
             }
 
-            // Fetch match history
             function updateMatchHistory(username) {
                 fetch('https://d82c5016-bcff-40a1-aa09-768942016abd-00-39hwdpipka72n.janeway.replit.dev/match-history')
-                    .then(response => {
-                        if (!response.ok) throw new Error('Network response was not ok');
-                        return response.json();
-                    })
+                    .then(response => response.json())
                     .then(data => {
                         const historyDiv = document.getElementById("history-list");
                         historyDiv.innerHTML = data.length > 0
@@ -712,7 +694,7 @@
                 if (userData[currentUser]?.isBanned) {
                     document.getElementById("banned-notice").classList.add("hidden");
                     document.getElementById("content").classList.remove("hidden");
-                } else if (userData[currentUser].team) {
+                } else if (userData[currentUser]?.team) {
                     teams[userData[currentUser].team] = teams[userData[currentUser].team].filter(u => u !== currentUser);
                     userData[currentUser].team = null;
                 }
@@ -726,23 +708,33 @@
             }
 
             function updateUI() {
-                if (!currentUser || !userData[currentUser] || userData[currentUser].isBanned) {
-                    showBannedNotice();
-                    return;
+                const loginBtn = document.getElementById("login-btn");
+                const registerBtn = document.getElementById("register-btn");
+                const profileBtn = document.getElementById("profile-btn");
+                const playBtn = document.getElementById("play-btn");
+                const joinFriendBtn = document.getElementById("join-friend-btn");
+                const logoutBtn = document.getElementById("logout-btn");
+                const adminToolsBtn = document.getElementById("admin-tools-btn");
+                const friendsBtn = document.getElementById("friends-btn");
+                const messagesBtn = document.getElementById("messages-btn");
+                const matchmakingBtn = document.getElementById("matchmaking-btn");
+                const groupChatBtn = document.getElementById("group-chat-btn");
+
+                if (loginBtn && registerBtn && profileBtn && playBtn && joinFriendBtn && logoutBtn && adminToolsBtn && friendsBtn && messagesBtn && matchmakingBtn && groupChatBtn) {
+                    loginBtn.classList.toggle("hidden", isLoggedIn);
+                    registerBtn.classList.toggle("hidden", isLoggedIn);
+                    profileBtn.classList.toggle("hidden", !isLoggedIn);
+                    playBtn.classList.toggle("hidden", !isLoggedIn);
+                    joinFriendBtn.classList.toggle("hidden", !isLoggedIn);
+                    logoutBtn.classList.toggle("hidden", !isLoggedIn);
+                    adminToolsBtn.classList.toggle("hidden", !isLoggedIn || !userData[currentUser]?.isAdmin);
+                    friendsBtn.classList.toggle("hidden", !isLoggedIn);
+                    messagesBtn.classList.toggle("hidden", !isLoggedIn);
+                    matchmakingBtn.classList.toggle("hidden", !isLoggedIn);
+                    groupChatBtn.classList.toggle("hidden", !isLoggedIn);
+                    document.getElementById("chat").classList.toggle("hidden", !isLoggedIn);
+                    setButtonColor();
                 }
-                document.getElementById("login-btn").classList.toggle("hidden", isLoggedIn);
-                document.getElementById("register-btn").classList.toggle("hidden", isLoggedIn);
-                document.getElementById("profile-btn").classList.toggle("hidden", !isLoggedIn);
-                document.getElementById("play-btn").classList.toggle("hidden", !isLoggedIn);
-                document.getElementById("join-friend-btn").classList.toggle("hidden", !isLoggedIn);
-                document.getElementById("logout-btn").classList.toggle("hidden", !isLoggedIn);
-                document.getElementById("admin-tools-btn").classList.toggle("hidden", !isLoggedIn || !userData[currentUser]?.isAdmin);
-                document.getElementById("friends-btn").classList.toggle("hidden", !isLoggedIn);
-                document.getElementById("messages-btn").classList.toggle("hidden", !isLoggedIn);
-                document.getElementById("matchmaking-btn").classList.toggle("hidden", !isLoggedIn);
-                document.getElementById("group-chat-btn").classList.toggle("hidden", !isLoggedIn);
-                document.getElementById("chat").classList.toggle("hidden", !isLoggedIn);
-                setButtonColor();
             }
 
             function updateProfile(username) {
@@ -780,7 +772,6 @@
                 userData[username].deaths = deaths;
                 saveUserData();
 
-                // Update leaderboard on server
                 fetch('https://d82c5016-bcff-40a1-aa09-768942016abd-00-39hwdpipka72n.janeway.replit.dev/leaderboard', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -864,7 +855,6 @@
                 userData[currentUser].gamesPlayed = (userData[currentUser].gamesPlayed || 0) + 1;
                 const team = assignTeam(currentUser);
 
-                // Simulate match data
                 const matchData = {
                     player: currentUser,
                     kills: Math.floor(Math.random() * 20),
@@ -873,12 +863,10 @@
                     timestamp: new Date().toLocaleString(),
                 };
 
-                // Update user stats
                 userData[currentUser].kills += matchData.kills;
                 userData[currentUser].deaths += matchData.deaths;
                 if (Math.random() < 0.3) userData[currentUser].wins = (userData[currentUser].wins || 0) + 1;
 
-                // Send match data to server
                 fetch('https://d82c5016-bcff-40a1-aa09-768942016abd-00-39hwdpipka72n.janeway.replit.dev/match-history', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -891,7 +879,6 @@
                     })
                     .catch(error => console.error("Failed to send match data:", error));
 
-                // Update leaderboard
                 fetch('https://d82c5016-bcff-40a1-aa09-768942016abd-00-39hwdpipka72n.janeway.replit.dev/leaderboard', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -1137,7 +1124,6 @@
                 userData[currentUser].deaths = simulatedStats.deaths;
                 saveUserData();
 
-                // Update leaderboard on server
                 fetch('https://d82c5016-bcff-40a1-aa09-768942016abd-00-39hwdpipka72n.janeway.replit.dev/leaderboard', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -1471,92 +1457,122 @@
                 playSound('fanfare');
             }
 
-                            function removeAdmin() {
-                    if (!currentUser || !userData[currentUser] || userData[currentUser].isBanned || !userData[currentUser]?.isOwner) return alert("Only the owner can remove admins!");
-                    const target = document.getElementById("admin-target").value.trim();
-                    if (!target) return alert("Please enter a username to remove as admin.");
-                    if (!userData[target]) return alert("User not found!");
-                    if (!userData[target].isAdmin) return alert("User is not an admin!");
-                    if (userData[target].isOwner) return alert("Cannot remove the owner!");
-                    userData[target].isAdmin = false;
-                    saveUserData();
-                    alert(`${target} is no longer an admin!`);
-                    playSound('click');
-                }
+                            if (!target) return alert("Please enter a username to remove admin from.");
+                if (!userData[target]) return alert("User not found!");
+                if (!userData[target].isAdmin) return alert("User is not an admin!");
+                if (target === currentUser && !userData[currentUser].isOwner) return alert("You cannot remove yourself as an admin unless you are the owner!");
+                userData[target].isAdmin = false;
+                saveUserData();
+                alert(`${target} is no longer an admin!`);
+                playSound('click');
+            }
 
-                function resetUserStats() {
-                    if (!currentUser || !userData[currentUser] || userData[currentUser].isBanned || !userData[currentUser]?.isAdmin) return alert("You are not an admin or are banned!");
-                    const target = document.getElementById("admin-target").value.trim();
-                    if (!target) return alert("Please enter a username to reset stats for.");
-                    if (!userData[target]) return alert("User not found!");
-                    if (userData[target].isOwner && !userData[currentUser].isOwner) return alert("Only the owner can reset the owner's stats!");
-                    userData[target].kills = 0;
-                    userData[target].deaths = 0;
-                    userData[target].wins = 0;
-                    userData[target].gamesPlayed = 0;
-                    userData[target].history = [];
-                    saveUserData();
-                    alert(`${target}'s stats have been reset!`);
-                    playSound('click');
-                    if (target === currentUser) updateProfile(currentUser);
+            function resetUserStats() {
+                if (!currentUser || !userData[currentUser] || userData[currentUser].isBanned || !userData[currentUser]?.isAdmin) return alert("You are not an admin or are banned!");
+                const target = document.getElementById("admin-target").value.trim();
+                if (!target) return alert("Please enter a username to reset stats.");
+                if (!userData[target]) return alert("User not found!");
+                if (userData[target].isOwner) return alert("You cannot reset the owner's stats!");
+                userData[target].kills = 0;
+                userData[target].deaths = 0;
+                userData[target].wins = 0;
+                userData[target].gamesPlayed = 0;
+                userData[target].history = [];
+                saveUserData();
+                alert(`${target}'s stats have been reset!`);
+                playSound('click');
+                updateLeaderboard();
+                updateProfile(target);
+            }
 
-                    // Update leaderboard on server
-                    fetch('https://d82c5016-bcff-40a1-aa09-768942016abd-00-39hwdpipka72n.janeway.replit.dev/leaderboard', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ name: target, kills: 0, deaths: 0 })
-                    })
-                        .then(response => response.json())
-                        .then(data => {
-                            console.log("Leaderboard updated after stats reset:", data);
-                            updateLeaderboard();
-                        })
-                        .catch(error => console.error("Failed to update leaderboard:", error));
-                }
-
-                function massBan() {
-                    if (!currentUser || !userData[currentUser] || userData[currentUser].isBanned || !userData[currentUser]?.isAdmin) return alert("You are not an admin or are banned!");
-                    if (confirm("Are you sure you want to ban all non-admin users?")) {
-                        for (let user in userData) {
-                            if (!userData[user].isAdmin && !userData[user].isOwner) {
-                                userData[user].isBanned = true;
-                                userData[user].banReason = "Mass ban by admin";
-                            }
-                        }
-                        saveUserData();
-                        alert("All non-admin users have been banned!");
-                        if (userData[currentUser].isBanned) showBannedNotice();
-                        playSound('click');
+            function massBan() {
+                if (!currentUser || !userData[currentUser] || userData[currentUser].isBanned || !userData[currentUser]?.isAdmin) return alert("You are not an admin or are banned!");
+                const reason = document.getElementById("ban-reason").value.trim();
+                const usersToBan = prompt("Enter usernames to ban (separated by commas):").split(',').map(u => u.trim()).filter(u => u);
+                if (!usersToBan.length) return alert("Please enter at least one username.");
+                let bannedCount = 0;
+                usersToBan.forEach(target => {
+                    if (userData[target] && !userData[target].isOwner && (!userData[target].isAdmin || userData[currentUser].isOwner)) {
+                        userData[target].isBanned = true;
+                        userData[target].banReason = reason || "Mass ban";
+                        bannedCount++;
                     }
-                }
+                });
+                saveUserData();
+                alert(`${bannedCount} user(s) have been banned!`);
+                playSound('click');
+                if (usersToBan.includes(currentUser)) showBannedNotice();
+            }
 
-                function massUnban() {
-                    if (!currentUser || !userData[currentUser] || userData[currentUser].isBanned || !userData[currentUser]?.isAdmin) return alert("You are not an admin or are banned!");
-                    if (confirm("Are you sure you want to unban all users?")) {
-                        for (let user in userData) {
-                            userData[user].isBanned = false;
-                            userData[user].banReason = "";
-                        }
-                        saveUserData();
-                        alert("All users have been unbanned!");
-                        playSound('click');
+            function massUnban() {
+                if (!currentUser || !userData[currentUser] || userData[currentUser].isBanned || !userData[currentUser]?.isAdmin) return alert("You are not an admin or are banned!");
+                const usersToUnban = prompt("Enter usernames to unban (separated by commas):").split(',').map(u => u.trim()).filter(u => u);
+                if (!usersToUnban.length) return alert("Please enter at least one username.");
+                let unbannedCount = 0;
+                usersToUnban.forEach(target => {
+                    if (userData[target]) {
+                        userData[target].isBanned = false;
+                        userData[target].banReason = "";
+                        unbannedCount++;
                     }
-                }
+                });
+                saveUserData();
+                alert(`${unbannedCount} user(s) have been unbanned!`);
+                playSound('click');
+            }
 
-                function exportData() {
-                    if (!currentUser || !userData[currentUser] || userData[currentUser].isBanned) return;
-                    const dataStr = JSON.stringify(userData[currentUser], null, 2);
-                    const blob = new Blob([dataStr], { type: "application/json" });
-                    const url = URL.createObjectURL(blob);
-                    const a = document.createElement("a");
-                    a.href = url;
-                    a.download = `${currentUser}_data.json`;
-                    a.click();
-                    URL.revokeObjectURL(url);
-                    alert("Your data has been exported!");
-                    playSound('click');
+            function initiateRobloxLogin() {
+                if (!currentUser || !userData[currentUser] || userData[currentUser].isBanned) return;
+                // Simulate Roblox login (in a real app, this would redirect to Roblox OAuth)
+                const robloxUsername = prompt("Enter your Roblox username:");
+                if (robloxUsername) {
+                    if (!userData[robloxUsername]) {
+                        register(); // Reuse register function if new user
+                    }
+                    currentUser = robloxUsername;
+                    isLoggedIn = true;
+                    localStorage.setItem('currentUser', currentUser);
+                    userData[currentUser] = userData[currentUser] || {
+                        password: 'roblox_auto',
+                        gamesPlayed: 0,
+                        kills: 0,
+                        deaths: 0,
+                        wins: 0,
+                        history: [],
+                        friends: [],
+                        messages: [],
+                        reports: [],
+                        bio: '',
+                        lastLogin: null,
+                        team: null,
+                        titles: ["Rookie"],
+                        activeTitle: "Rookie",
+                        isAdmin: false,
+                        isBanned: false,
+                        banReason: ''
+                    };
+                    saveUserData();
+                    updateUI();
+                    updateProfile(currentUser);
+                    showPage('home');
+                    alert(`Logged in with Roblox as ${robloxUsername}!`);
+                    playSound('fanfare');
                 }
-            });
+            }
+
+            function exportData() {
+                if (!currentUser || !userData[currentUser] || userData[currentUser].isBanned) return;
+                const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(userData[currentUser], null, 2));
+                const downloadAnchorNode = document.createElement('a');
+                downloadAnchorNode.setAttribute("href", dataStr);
+                downloadAnchorNode.setAttribute("download", `${currentUser}_data.json`);
+                document.body.appendChild(downloadAnchorNode);
+                downloadAnchorNode.click();
+                downloadAnchorNode.remove();
+                playSound('click');
+                alert("User data exported successfully!");
+            }
+        });
     </script>
 </body>
 </html>
